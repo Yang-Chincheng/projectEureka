@@ -1,9 +1,35 @@
 package org.kadf.app.eureka
 
-fun main(args: Array<String>) {
-    println("Hello World!")
+//import org.antlr.v4.*
+import org.antlr.v4.runtime.CharStreams
+import java.io.FileInputStream
+import java.lang.IndexOutOfBoundsException
 
-    // Try adding program arguments via Run/Debug configuration.
-    // Learn more about running applications: https://www.jetbrains.com/help/idea/running-applications.html.
-    println("Program arguments: ${args.joinToString()}")
+fun main(args: Array<String>) {
+    val input = try {
+        when (args[1]) {
+            "console" -> System.`in`
+            "file" -> FileInputStream(args[2])
+            else -> throw Exception("unknown input option.")
+        }
+    } catch(e: IndexOutOfBoundsException) {
+        println("too few arguments.")
+        return
+    } catch(e: NoSuchFileException) {
+        println("code file not found.")
+        return
+    } catch(e: Exception) {
+        println(e.message)
+        return
+    }.let {
+        CharStreams.fromStream(it)
+    }
+
+    when (args[0]) {
+        "testrig" -> {}
+        "parse" -> {}
+        "semantic" -> {}
+        "codegen" -> {}
+        else -> {}
+    }
 }
