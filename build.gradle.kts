@@ -26,6 +26,11 @@ tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "1.8"
 }
 
+tasks.generateGrammarSource {
+    arguments = arguments + listOf("-visitor", "-package", "org.kadf.app.eureka")
+    outputDirectory = file("$outputDirectory/org/kadf/app/eureka")
+}
+
 application {
     mainClass.set("org.kadf.app.eureka.MainKt")
 }
