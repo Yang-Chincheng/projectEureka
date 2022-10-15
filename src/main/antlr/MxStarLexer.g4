@@ -70,13 +70,15 @@ fragment LowerCaseChars: [a-z];
 fragment NonzereDigits: [1-9];
 fragment Digits: [0-9];
 
-Identifer: [a-zA-Z] [a-zA-Z0-9_]*;
+fragment IdentifierHead: [a-zA-Z];
+fragment IdentifierBody: [a-zA-Z0-9_];
+Identifier: IdentifierHead IdentifierBody*;
 // CammelCaseIdentier: (UpperCaseCharacters LowerCaseCharacters*)+; MixCammelCaseIdentifer:
 // LowerCaseCharacters+ (UpperCaseCharacters LowerCaseCharacters*)*;
 
 // Literals
-fragment Sign: [-+]?;
-IntLiteral: Sign '0' | Sign [1-9] [0-9]*;
+fragment Sign: [-+];
+IntLiteral: '0' | [1-9] [0-9]*;
 
 fragment CharLiteral: '\\' . | ~["\\];
 StrLiteral: '"' CharLiteral* '"';

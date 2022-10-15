@@ -16,36 +16,36 @@ progDecl:
 varDecl:
 	declarableType (vars += varDeclEntry ',')* vars += varDeclEntry;
 
-varDeclEntry: Identifer (Assign expression)?;
+varDeclEntry: Identifier ('=' expression)?;
 
 // class
-classDecl: Class Identifer classBlock;
+classDecl: Class Identifier classBlock;
 
 classBlock: '{' classMember* '}';
 
 classMember:
-	constr		# ClassConstr
-	| funcDecl	# ClassMethod
-	| varDecl	# ClassProper;
+	constr		    # ClassConstr
+	| funcDecl	    # ClassMethod
+	| varDecl ';'	# ClassProper;
 
-constr: Identifer '(' ')' stmtBlock;
+constr: Identifier '(' ')' stmtBlock;
 
 // function
-funcDecl: returnableType Identifer funcDeclArgs stmtBlock;
+funcDecl: returnableType Identifier funcDeclParas stmtBlock;
 
-funcDeclArgs:
-	'(' (args += funcDeclArgsEntry ',')* args += funcDeclArgsEntry? ')';
+funcDeclParas:
+	'(' (args += funcDeclParasEntry ',')* args += funcDeclParasEntry? ')';
 
-funcDeclArgsEntry: declarableType Identifer;
+funcDeclParasEntry: declarableType Identifier;
 
 /* Type Parser Rules */
-nonVoidType: (Int | String | Bool) | Identifer;
+nonVoidType: (Int | String | Bool) | Identifier;
 
 declarableType: nonVoidType | arrayType;
 
 arrayType: nonVoidType ('[' ']')+;
 
-newableArrayType: nonVoidType ('[' len += expression? ']')+;
+newableArrayType: nonVoidType ('[' lens += expression? ']')+;
 
 returnableType: Void | nonVoidType | arrayType;
 
@@ -77,42 +77,30 @@ forInit: varDecl | expression;
 forLoop:
 	For '(' init = forInit? ';' condi = expression? ';' iter = expression? ')' loopBlock;
 
-whileLoop: While '(' condi = expression? ')' loopBlock;
+whileLoop: While '(' condi = expression ')' loopBlock;
+
 
 /* Expression Parse Rules */
-// expression: lvalueExpr # LValueExpr | rvalueExpr # RValueExpr | expression ',' last = expression # Compnd;
+literalExpr:
+    This
+    | Null
+    | Boolean
+    | IntLiteral
+    | StrLiteral;
 
-lvalueExpr:
-	Identifer															# AtomicLExpr
-	| This																# AtomicLExpr
-	| arr = lvalueExpr '[' idx = expression ']'							# IndexLExpr
-	| obj = lvalueExpr '.' prop = Identifer								# AccessLExpr
-	| lvalueExpr funcCallArgs											# FuncInvkLExpr
-	| lambdaExpr funcCallArgs											# LambdaInvkLExpr
-	| op = ('++' | '--') obj = lvalueExpr								# PrefixUpdLExpr
-	| <assoc = right> lexpr = lvalueExpr op = '=' rexpr = expression	# AssignLExpr
-	| '(' (rest += expression ',')* last = lvalueExpr ')'				# CompndLExpr;
+atomicExpr:
+    Identifier
+    | literalExpr;
 
-// indexableExpr : lvalueExpr ;
-
-// accessibleExpr : lvalueExpr ;
-
-// callableExpr : lvalueExpr # NormalCallableExpr | lambdaExpr # LambdaCallableExpr ;
-
-lambdaExpr: '[' cap = '&'? ']' funcDeclArgs '->' stmtBlock;
-
-funcCallArgs:
-	'(' (args += expression ',')* args += expression? ')';
-
-// rvalueExpr:
 expression:
-	StrLiteral																# LiteralExpr
-	| IntLiteral															# LiteralExpr
-	| Boolean																# LiteralExpr
-	| Null																	# LiteralExpr
-	| lvalueExpr															# LValueExpr
-	| 'new' newableSyntax													# NewExpr
-	| lexpr = lvalueExpr op = ('++' | '--')									# PostfixUpdExpr
+	atomicExpr															# LValueExpr
+	| arr = expression '[' idx = expression ']'							# IndexLExpr
+    | obj = expression '.' prop = Identifier								# AccessLExpr
+    | callee = expression funcCallArgs									# FuncInvkLExpr
+    | callee = lambdaExpr funcCallArgs									# LambdaInvkLExpr
+	| 'new' newableSyntax													    # NewExpr
+    | op = ('++' | '--') obj = expression								# PrefixUpdLExpr
+	| obj = expression op = ('++' | '--')									# PostfixUpdExpr
 	| <assoc = right> op = ('!' | '~' | '+' | '-') rexpr = expression		# UnaryExpr
 	| lexpr = expression op = ('*' | '/' | '%') rexpr = expression			# BinaryExpr
 	| lexpr = expression op = ('+' | '-') rexpr = expression				# BinaryExpr
@@ -124,9 +112,14 @@ expression:
 	| lexpr = expression op = '|' rexpr = expression						# BinaryExpr
 	| lexpr = expression op = '&&' rexpr = expression						# BinaryExpr
 	| lexpr = expression op = '||' rexpr = expression						# BinaryExpr
-	| '(' expr = expression ')'												# CompndExpr
-	| <assoc = right> rest = expression ',' last = expression				# CompndExpr;
+    | <assoc = right> lexpr = expression op = '=' rexpr = expression	# AssignLExpr
+	| '(' (rest += expression ',')* last = expression ')'                   # CompndExpr;
 
 newableSyntax:
 	newableArrayType		# NewArray
-	| Identifer ('(' ')')?	# NewObject;
+	| Identifier ('(' ')')?	# NewObject;
+
+lambdaExpr: '[' cap = '&'? ']' funcDeclParas '->' stmtBlock;
+
+funcCallArgs:
+	'(' (args += expression ',')* args += expression? ')';
