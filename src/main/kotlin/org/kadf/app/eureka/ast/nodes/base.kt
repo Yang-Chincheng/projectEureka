@@ -3,8 +3,8 @@ package org.kadf.app.eureka.ast.nodes
 import org.kadf.app.eureka.CodeContext
 import org.kadf.app.eureka.ast.ASTVisitor
 
-sealed class ASTNode(val ctx: CodeContext) {
-    abstract fun accept(visitor: ASTVisitor)
+sealed class ASTNode(val ctx: CodeContext?) {
+    abstract fun accept(visitor: ASTVisitor): Any
 }
 
 sealed interface IDeclaration

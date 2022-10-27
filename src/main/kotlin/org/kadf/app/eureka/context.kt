@@ -1,10 +1,16 @@
 package org.kadf.app.eureka
 
-class SourceFile(private val filename: String) {
+import org.antlr.v4.runtime.ParserRuleContext
+import org.antlr.v4.runtime.Token
+
+class CodeSource(private val filename: String) {
     override fun toString(): String = filename
 }
 
 class CodePosition(private val line: Int, private val column: Int) {
+
+    constructor(token: Token): this(token.line, token.charPositionInLine) {}
+
     operator fun compareTo(other: CodePosition): Int {
         return when {
             line < other.line -> -1
@@ -19,8 +25,11 @@ class CodePosition(private val line: Int, private val column: Int) {
     override fun toString(): String = "$line:$column"
 }
 
-class CodeContext(val source: SourceFile?, val begin: CodePosition, val end: CodePosition) {
+class CodeContext(val source: CodeSource?, val start: CodePosition, val stop: CodePosition) {
     init {
-        if (begin > end) throw Exception("invalid code segment");
+        if (start > stop) throw Exception("invalid code segment");
     }
+
+    constructor(src: CodeSource?, ctx: ParserRuleContext):
+            this(src, CodePosition(ctx.start), CodePosition(ctx.stop))
 }

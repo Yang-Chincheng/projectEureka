@@ -1,10 +1,13 @@
 package org.kadf.app.eureka.ast
 
-enum class Operator(val symbol: String) {
+enum class Operator(symbol: String) {
     PRE_INC("++|"),
     PRE_DEC("--|"),
     POST_INC("|++"),
     POST_DEC("|--"),
+
+    POSIT("+|"),
+    NEG("-|"),
 
     PLUS("+"),
     MINUS("-"),
@@ -29,4 +32,5 @@ enum class Operator(val symbol: String) {
     LOGIC_NOT("!"),
     LOGIC_AND("&&"),
     LOGIC_OR("||")
+
 }

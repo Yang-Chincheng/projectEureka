@@ -18,6 +18,13 @@ class BlockStmtNode(
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
+class VarDeclStmtNode(
+    ctx: CodeContext,
+    val decl: VarDeclNode
+): ASTNode(ctx), IStatement {
+    override fun accept(visitor: ASTVisitor) = visitor.visit(this)
+}
+
 class ExprStmtNode(
     ctx: CodeContext,
     val expr: IExpression
@@ -28,8 +35,8 @@ class ExprStmtNode(
 class BranchStmtNode(
     ctx: CodeContext,
     val cond: IExpression,
-    val ifBody: BlockStmtNode,
-    val elseBody: BlockStmtNode?
+    val thenBody: IStatement,
+    val elseBody: IStatement?
 ): ASTNode(ctx), IStatement {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
@@ -54,14 +61,9 @@ class WhileLoopStmtNode(
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class BreakStmtNode(
-    ctx: CodeContext
-): ASTNode(ctx), IStatement {
-    override fun accept(visitor: ASTVisitor) = visitor.visit(this)
-}
-
-class ContinueStmtNode(
-    ctx: CodeContext
+class ControlStmtNode(
+    ctx: CodeContext,
+    val ctrl: String
 ): ASTNode(ctx), IStatement {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
