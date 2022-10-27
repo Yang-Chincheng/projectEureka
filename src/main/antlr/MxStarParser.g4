@@ -14,9 +14,9 @@ progDecl:
 
 // variable
 varDecl:
-	declarableType (vars += varDeclEntry ',')* vars += varDeclEntry;
+	type = declarableType (entries += variableListEntry ',')* entries += variableListEntry;
 
-varDeclEntry: Identifier ('=' expression)?;
+variableListEntry: Identifier ('=' expression)?;
 
 // class
 classDecl: Class Identifier classBlock;
@@ -24,28 +24,24 @@ classDecl: Class Identifier classBlock;
 classBlock: '{' classMember* '}';
 
 classMember:
-	constr		    # ClassConstr
-	| funcDecl	    # ClassMethod
-	| varDecl ';'	# ClassProper;
-
-constr: Identifier '(' ')' stmtBlock;
+	Identifier '(' ')' stmtBlock	# ClassConstr
+	| funcDecl						# ClassMethod
+	| varDecl ';'					# ClassProper;
 
 // function
-funcDecl: returnableType Identifier funcDeclParas stmtBlock;
+funcDecl: returnableType Identifier parameterList stmtBlock;
 
-funcDeclParas:
-	'(' (args += funcDeclParasEntry ',')* args += funcDeclParasEntry? ')';
+parameterList:
+	'(' (entrys += parameterListEntry ',')* entrys += parameterListEntry? ')';
 
-funcDeclParasEntry: declarableType Identifier;
+parameterListEntry: declarableType Identifier;
 
 /* Type Parser Rules */
-nonVoidType: (Int | String | Bool) | Identifier;
+nonVoidType: Int | String | Bool | Identifier;
+
+arrayType: nonVoidType (total += '[' ']')+;
 
 declarableType: nonVoidType | arrayType;
-
-arrayType: nonVoidType ('[' ']')+;
-
-newableArrayType: nonVoidType ('[' lens += expression? ']')+;
 
 returnableType: Void | nonVoidType | arrayType;
 
@@ -53,73 +49,50 @@ returnableType: Void | nonVoidType | arrayType;
 stmtBlock: '{' statement* '}';
 
 statement:
-	expression ';'					# ExprStmt
-	| varDecl ';'					# DeclStmt
-	| branch						# BranchStmt
-	| loop							# LoopStmt
-	| ctrl = (Continue | Break) ';'	# CtrlStmt
-	| Return ret = expression? ';'	# ReturnStmt
-	| stmtBlock						# BlockStmt
-	| ';'							# EmptyStmt;
+	expression ';'	# ExprStmt
+	| varDecl ';'	# DeclStmt
+	| If '(' condi = expression ')' thenblk = statement (Else elseblk = statement)?	         # BranchStmt
+	| For '(' init = forLoopInit? ';' condi = expression? ';' iter = expression? ')' statement	 # ForLoopStmt
+	| While '(' condi = expression ')' statement	# WhileLoopStmt
+	| ctrl = (Continue | Break) ';'					# CtrlStmt
+	| Return ret = expression? ';'					# ReturnStmt
+	| stmtBlock										# BlockStmt
+	| ';'											# EmptyStmt;
 
-branchBlock: stmtBlock | statement;
-
-branch:
-	If '(' condi = expression ')' ifblk = branchBlock Else elseblk = branchBlock	# IfElseStmt
-	| If '(' condi = expression ')' ifblk = branchBlock								# IfStmt;
-
-loopBlock: stmtBlock | statement;
-
-loop: forLoop # ForLoopStmt | whileLoop # WhlieLoopStmt;
-
-forInit: varDecl | expression;
-
-forLoop:
-	For '(' init = forInit? ';' condi = expression? ';' iter = expression? ')' loopBlock;
-
-whileLoop: While '(' condi = expression ')' loopBlock;
-
+forLoopInit: varDecl | expression;
 
 /* Expression Parse Rules */
-literalExpr:
-    This
-    | Null
-    | Boolean
-    | IntLiteral
-    | StrLiteral;
-
-atomicExpr:
-    Identifier
-    | literalExpr;
+literal: This | Null | True | False | IntLiteral | StrLiteral;
 
 expression:
-	atomicExpr															# LValueExpr
-	| arr = expression '[' idx = expression ']'							# IndexLExpr
-    | obj = expression '.' prop = Identifier								# AccessLExpr
-    | callee = expression funcCallArgs									# FuncInvkLExpr
-    | callee = lambdaExpr funcCallArgs									# LambdaInvkLExpr
-	| 'new' newableSyntax													    # NewExpr
-    | op = ('++' | '--') obj = expression								# PrefixUpdLExpr
-	| obj = expression op = ('++' | '--')									# PostfixUpdExpr
-	| <assoc = right> op = ('!' | '~' | '+' | '-') rexpr = expression		# UnaryExpr
-	| lexpr = expression op = ('*' | '/' | '%') rexpr = expression			# BinaryExpr
-	| lexpr = expression op = ('+' | '-') rexpr = expression				# BinaryExpr
-	| lexpr = expression op = ('<<' | '>>') rexpr = expression				# BinaryExpr
-	| lexpr = expression op = ('<' | '<=' | '>' | '>=') rexpr = expression	# BinaryExpr
-	| lexpr = expression op = ('==' | '!=') rexpr = expression				# BinaryExpr
-	| lexpr = expression op = '&' rexpr = expression						# BinaryExpr
-	| lexpr = expression op = '^' rexpr = expression						# BinaryExpr
-	| lexpr = expression op = '|' rexpr = expression						# BinaryExpr
-	| lexpr = expression op = '&&' rexpr = expression						# BinaryExpr
-	| lexpr = expression op = '||' rexpr = expression						# BinaryExpr
-    | <assoc = right> lexpr = expression op = '=' rexpr = expression	# AssignLExpr
-	| '(' (rest += expression ',')* last = expression ')'                   # CompndExpr;
+	literal					# LiteralExpr
+	| var = Identifier  # AtomicVarExpr
+	| arr = expression '[' idx = expression ']'								# IndexExpr
+	| obj = expression '.' var = Identifier # MemberVarExpr
+	| func = Identifier call = argumentList # AtomicFuncInvkExpr
+	| obj = expression '.' func = Identifier call = argumentList # MemberFuncInvkExpr
+	| '[' cap = '&'? ']' parameterList '->' stmtBlock argumentList								# LambdaInvkExpr
+	| 'new' newableSyntax													# NewExpr
+	| op = ('++' | '--') obj = expression									# PreUpdExpr
+	| obj = expression op = ('++' | '--')									# PostUpdExpr
+	| <assoc = right> op = ('!' | '~' | '+' | '-') rhs = expression		# UnaryExpr
+	| lhs = expression op = ('*' | '/' | '%') rhs = expression			# BinaryExpr
+	| lhs = expression op = ('+' | '-') rhs = expression				# BinaryExpr
+	| lhs = expression op = ('<<' | '>>') rhs = expression				# BinaryExpr
+	| lhs = expression op = ('<' | '<=' | '>' | '>=') rhs = expression	# BinaryExpr
+	| lhs = expression op = ('==' | '!=') rhs = expression				# BinaryExpr
+	| lhs = expression op = '&' rhs = expression						# BinaryExpr
+	| lhs = expression op = '^' rhs = expression						# BinaryExpr
+	| lhs = expression op = '|' rhs = expression						# BinaryExpr
+	| lhs = expression op = '&&' rhs = expression						# BinaryExpr
+	| lhs = expression op = '||' rhs = expression						# BinaryExpr
+	| <assoc = right> lhs = expression op = '=' rhs = expression		# AssignExpr
+	| '(' (rest += expression ',')* last = expression ')'					# CompndExpr;
 
 newableSyntax:
-	newableArrayType		# NewArray
-	| Identifier ('(' ')')?	# NewObject;
+    nonVoidType (total += '[' ']')+ # NewUnscaledArray
+	| nonVoidType (total += '[' scales += expression ']')+ (total += '[' ']')* # NewScaledArray
+	| nonVoidType ('(' ')')?						# NewObject;
 
-lambdaExpr: '[' cap = '&'? ']' funcDeclParas '->' stmtBlock;
-
-funcCallArgs:
+argumentList:
 	'(' (args += expression ',')* args += expression? ')';

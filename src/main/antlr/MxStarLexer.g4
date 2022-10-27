@@ -4,7 +4,7 @@ channels {
 	COMMENT_CHANNEL
 }
 
-WhiteSpace: [ \r\n\t]+ -> skip;
+WS: [ \r\n\t]+ -> skip;
 SingleLineComment: '//' ~[\r\n]* -> channel(COMMENT_CHANNEL);
 MultiLineComment: '/*' .*? '*/' -> channel(COMMENT_CHANNEL);
 
@@ -16,7 +16,7 @@ String: 'string';
 New: 'new';
 Class: 'class';
 Null: 'null';
-True: 'ture';
+True: 'true';
 False: 'false';
 This: 'this';
 If: 'if';
@@ -64,12 +64,6 @@ LBrace: '{';
 RBrace: '}';
 
 // Identifers
-fragment Chars: [a-zA-Z];
-fragment UpperCaseChars: [A-Z];
-fragment LowerCaseChars: [a-z];
-fragment NonzereDigits: [1-9];
-fragment Digits: [0-9];
-
 fragment IdentifierHead: [a-zA-Z];
 fragment IdentifierBody: [a-zA-Z0-9_];
 Identifier: IdentifierHead IdentifierBody*;
@@ -77,11 +71,8 @@ Identifier: IdentifierHead IdentifierBody*;
 // LowerCaseCharacters+ (UpperCaseCharacters LowerCaseCharacters*)*;
 
 // Literals
-fragment Sign: [-+];
 IntLiteral: '0' | [1-9] [0-9]*;
 
 fragment CharLiteral: '\\' . | ~["\\];
 StrLiteral: '"' CharLiteral* '"';
-
-Boolean: True | False;
 
