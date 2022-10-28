@@ -21,6 +21,7 @@ variableListEntry: Identifier ('=' expression)?;
 // class
 classDecl: Class Identifier classBlock;
 
+
 classBlock: '{' classMember* '}';
 
 classMember:
@@ -68,7 +69,7 @@ expression:
 	literal					# LiteralExpr
 	| var = Identifier  # AtomicVarExpr
 	| arr = expression '[' idx = expression ']'								# IndexExpr
-	| obj = expression '.' var = Identifier # MemberVarExpr
+	| obj = expression '.' (Identifier | '(' Identifier ')') # MemberVarExpr
 	| func = Identifier call = argumentList # AtomicFuncInvkExpr
 	| obj = expression '.' func = Identifier call = argumentList # MemberFuncInvkExpr
 	| '[' cap = '&'? ']' parameterList '->' stmtBlock argumentList								# LambdaInvkExpr
@@ -90,9 +91,10 @@ expression:
 	| '(' (rest += expression ',')* last = expression ')'					# CompndExpr;
 
 newableSyntax:
-    nonVoidType (total += '[' ']')+ # NewUnscaledArray
-	| nonVoidType (total += '[' scales += expression ']')+ (total += '[' ']')* # NewScaledArray
+    nonVoidType arrayDim+ # NewArray
 	| nonVoidType ('(' ')')?						# NewObject;
+
+arrayDim: '[' expression? ']';
 
 argumentList:
 	'(' (args += expression ',')* args += expression? ')';
