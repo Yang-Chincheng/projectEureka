@@ -1,34 +1,61 @@
 package org.kadf.app.eureka
 
-import org.antlr.v4.runtime.CharStreams
+import org.kadf.app.eureka.semantic.EurekaException
+import java.io.File
 import java.io.FileInputStream
-import java.lang.IndexOutOfBoundsException
+
 
 fun main(args: Array<String>) {
-    val input = try {
-        when (args[1]) {
-            "-console" -> System.`in`
-            "-file" -> FileInputStream(args[2])
-            else -> throw Exception("unknown input option.")
-        }
-    } catch (e: IndexOutOfBoundsException) {
-        println("too few arguments.")
-        return
-    } catch (e: NoSuchFileException) {
-        println("code file not found.")
-        return
-    } catch (e: Exception) {
+    val filename = "sema/basic-package/basic-69.mx"
+    val file = FileInputStream(filename)
+    val compiler = EurekaCompiler(file)
+    try {
+        compiler.eureka()
+    }
+    catch(e: EurekaException) {
+        println("MxE")
         println(e.message)
-        return
-    }.let {
-        CharStreams.fromStream(it!!)
+        println(e.ctx?.start ?: "null")
+        println(e.ctx?.stop ?: "null")
+        throw Exception()
     }
-
-    when (args[0]) {
-        "testrig" -> {}
-        "parse" -> {}
-        "semantic" -> {}
-        "codegen" -> {}
-        else -> {}
+    catch(e: Exception) {
+        println("test failed")
+        println(e.message)
+        throw e
     }
+    println("test succeeded")
+    var cnt = 10
+    File(filename).forEachLine {
+        if (cnt > 0) {
+            cnt--
+            println(it)
+        }
+    }
+//    val input = try {
+//        when (args[1]) {
+//            "-console" -> System.`in`
+//            "-file" -> FileInputStream(args[2])
+//            else -> throw Exception("unknown input option.")
+//        }
+//    } catch (e: IndexOutOfBoundsException) {
+//        println("too few arguments.")
+//        return
+//    } catch (e: NoSuchFileException) {
+//        println("code file not found.")
+//        return
+//    } catch (e: Exception) {
+//        println(e.message)
+//        return
+//    }.let {
+//        CharStreams.fromStream(it!!)
+//    }
+//
+//    when (args[0]) {
+//        "testrig" -> {}
+//        "parse" -> {}
+//        "semantic" -> {}
+//        "codegen" -> {}
+//        else -> {}
+//    }
 }
