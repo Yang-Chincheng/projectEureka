@@ -3,6 +3,7 @@ package org.kadf.app.eureka.ast
 import org.antlr.v4.runtime.ParserRuleContext
 import org.kadf.app.eureka.*
 import org.kadf.app.eureka.ast.nodes.*
+import org.kadf.app.eureka.utils.*
 
 class ASTBuilder(private val src: CodeSource?) : MxStarParserBaseVisitor<ASTNode>() {
 
@@ -164,16 +165,12 @@ class ASTBuilder(private val src: CodeSource?) : MxStarParserBaseVisitor<ASTNode
         node.argumentList().args?.filterNotNull()?.map { visit(it) as IExpression } ?: listOf()
     )
 
-    override fun visitNewUnscaledArray(node: MxStarParser.NewUnscaledArrayContext?) = NewArrayNode(
+    override fun visitNewArray(node: MxStarParser.NewArrayContext?) = NewArrayNode(
         node!!.ctx,
-        ArrayType(node.nonVoidType().type, node.total.size),
-        listOf()
-    )
-
-    override fun visitNewScaledArray(node: MxStarParser.NewScaledArrayContext?) = NewArrayNode(
-        node!!.ctx,
-        ArrayType(node.nonVoidType().type, node.total.size),
-        node.scales.map { visit(it) as IExpression }
+        ArrayType(node.nonVoidType().type, node.arrayDim().size),
+        node.arrayDim().map { dim ->
+            dim.expression()?.let { visit(it) as IExpression }
+        }
     )
 
     override fun visitNewObject(node: MxStarParser.NewObjectContext?) = NewObjectNode(

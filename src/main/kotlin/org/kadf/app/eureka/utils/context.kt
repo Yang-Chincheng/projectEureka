@@ -1,4 +1,4 @@
-package org.kadf.app.eureka
+package org.kadf.app.eureka.utils
 
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.Token

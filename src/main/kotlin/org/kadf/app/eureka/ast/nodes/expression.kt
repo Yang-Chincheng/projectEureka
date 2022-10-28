@@ -1,9 +1,9 @@
 package org.kadf.app.eureka.ast.nodes
 
-import org.kadf.app.eureka.CodeContext
+import org.kadf.app.eureka.utils.CodeContext
 import org.kadf.app.eureka.ast.*
 
-sealed interface IExpression
+sealed interface IExpression: IForLoopInit
 //sealed interface ILValueExpression : IExpression
 //sealed interface IRValueExpression : IExpression
 
@@ -87,7 +87,7 @@ sealed interface INewableSyntax: IExpression
 class NewArrayNode(
     ctx: CodeContext,
     val type: ArrayType,
-    val scales: List<IExpression>
+    val scales: List<IExpression?>
 ): ASTNode(ctx), INewableSyntax {
     init {
         if (scales.size > type.dim) throw Exception()

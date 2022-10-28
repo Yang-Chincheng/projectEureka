@@ -45,7 +45,7 @@ interface ASTVisitor {
     }
     fun visit(node: IForLoopInit): Any = when(node) {
         is VarDeclNode -> node.accept(this)
-        is IExpression -> visit(node as IExpression)
+        is IExpression -> visit(node)
     }
     fun visit(node: WhileLoopStmtNode): Any = visit(node.body)
     fun visit(node: ControlStmtNode): Any = Unit

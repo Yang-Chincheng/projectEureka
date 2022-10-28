@@ -1,6 +1,6 @@
 package org.kadf.app.eureka.ast.nodes
 
-import org.kadf.app.eureka.CodeContext
+import org.kadf.app.eureka.utils.CodeContext
 import org.kadf.app.eureka.ast.*
 
 class VarDeclNode(
