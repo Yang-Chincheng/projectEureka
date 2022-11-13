@@ -6,8 +6,8 @@ plugins {
     application
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+group = "org.kadf.me"
+version = "0.1.0"
 
 //java {
 //    sourceCompatibility = JavaVersion.VERSION_11
@@ -28,12 +28,18 @@ tasks.test {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "11"
+    kotlinOptions {
+        jvmTarget = "11"
+    }
 }
 
 tasks.generateGrammarSource {
     arguments = arguments + listOf("-visitor", "-package", "org.kadf.app.eureka")
     outputDirectory = file("$outputDirectory/org/kadf/app/eureka")
+}
+
+tasks.compileKotlin {
+    dependsOn(tasks.generateGrammarSource)
 }
 
 application {
