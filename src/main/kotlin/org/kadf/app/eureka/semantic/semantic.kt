@@ -23,6 +23,7 @@ class SemanticChecker : ASTVisitor {
         node.decls.filterIsInstance<ClassDeclNode>().forEach {
             tEnv.registerType(it.type, TypeBinding(vEnv.global, it).apply { isClass = true })
         }
+
         // global variable & function registry
         node.decls.filterIsInstance<FuncDeclNode>().forEach { decl ->
             if (!tEnv.containType(decl.type))
@@ -31,10 +32,12 @@ class SemanticChecker : ASTVisitor {
         }
         if (!vEnv.global.containFun("main"))
             throw Exception("do not have main function").with(node.ctx)
+
         // class member variable & function registry
         node.decls.filterIsInstance<ClassDeclNode>().forEach { decl ->
             val venv = tEnv.lookupType(decl.type) ?:
                 throw Exception("class not found when class member registry").with(node.ctx)
+
             decl.member.filterIsInstance<VarDeclNode>().forEach { mVar ->
                 if (!tEnv.containType(mVar.type))
                     throw Exception("class member var registry illegal type").with(node.ctx)
@@ -43,12 +46,12 @@ class SemanticChecker : ASTVisitor {
                 }
             }
             decl.member.filterIsInstance<FuncDeclNode>().forEach { mFun ->
-//                if (tEnv.containID(mFun.id)) throw Exception("class member fun check failed").with(node.ctx)
                 if (!tEnv.containType(mFun.type))
                     throw Exception("class member fun registry illegal type").with(node.ctx)
                 venv.registerFun(tEnv, mFun.id, mFun.type)
             }
         }
+
         // start semantic check
         node.decls.forEach { visit(it) }
     }
@@ -197,6 +200,7 @@ class SemanticChecker : ASTVisitor {
                         throw Exception("lambda return type mismatch while inferring").with(node.ctx)
                 }
                 else outerLambda.inferredReturnType = retType
+
             }
             outerFunc != null -> {
                 if (outerFunc.inferredReturnType != null) {
@@ -279,6 +283,11 @@ class SemanticChecker : ASTVisitor {
         }
         // body traverse
         node.body.forEach { visit(it) }
+        // arguments check
+        if (node.args.size != node.type.paraTypes.size) throw Exception()
+        node.type.paraTypes.zip(node.args).forEach {
+            if (!it.first.match(it.second)) throw Exception()
+        }
         // return type check
         val retType = (local.inferredReturnType as? IReturnableType) ?: UnitType
         return TypeInfo(retType, false).also { vEnv.leave() }
