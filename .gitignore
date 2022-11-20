@@ -42,3 +42,6 @@ bin/
 .DS_Store
 
 sema/
+src/test/
+src/main/gen/
+src/main/antlr/.antlr

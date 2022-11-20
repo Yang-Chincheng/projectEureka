@@ -1,13 +1,13 @@
 package org.kadf.app.eureka.ir
 
 sealed class Value(
-    val id: String,
     val type: Type,
+    val id: String? = null,
     private val userList: MutableList<IUser> = mutableListOf()
 ) {
     open fun addUser(user: IUser) { userList.add(user) }
-    open fun asOperand(): String = "<undef>"
-    override fun toString(): String = "<undef>"
+    override fun toString(): String = "$id"
+    open val ir: String = "<undef>"
 }
 
 class SymbolTable {

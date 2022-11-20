@@ -1,30 +1,76 @@
 package org.kadf.app.eureka.ir
 
-sealed class IRConst(val type: IRType): IRNode
+sealed interface IConstant
+sealed interface ISimpleConstant
 
-class BoolConst(val value: Boolean): IRConst(BoolType) {
-    override val text: String get() = "$value"
+class BoolConst(
+    val value: Boolean
+): Value(BoolType), IConstant, ISimpleConstant {
+    override fun toString(): String = "$value"
 }
 
-sealed class IntegerConst(len: Int, val value: Int): IRConst(IntegerType(len)) {
-    override val text: String get() = "${type.text} $value"
-}
-class IntConst(value: Int): IntegerConst(32, value)
-class CharConst(value: Int): IntegerConst(8, value)
-
-object NullConst: IRConst(PointerType) {
-    override val text: String get() = "null"
+class IntegerConst(
+    len: Int,
+    val value: Int
+): Value(IntegerType(len)), IConstant, ISimpleConstant {
+    override fun toString(): String = "$value"
 }
 
-class ArrayConst(val elements: List<IRConst>):
-    IRConst(ArrayType(elements.first().type as SingleValueType, elements.size)) {
-    override val text: String
-        get() = "[ ${elements.map { it.text }.reduce { acc, s -> "$acc, $s" }} ]"
+object NullConst: Value(PointerType), IConstant, ISimpleConstant {
+    override fun toString(): String = "null"
 }
 
-class StructConst(val elements: List<IRConst>):
-    IRConst(StructType(elements.map { it.type as FirstClassType})) {
-    override val text: String
-        get() = "{ ${elements.map { it.text }.reduce { acc, s -> "$acc, $s" }} }"
+class ArrayConst(
+    val value: List<Value>
+): Value(ArrayType(value.size, value.first().type)), IConstant {
+
+    constructor(
+        value: Value,
+        scale: List<Int>
+    ): this(
+        List(scale.first()) {
+            when (scale.size) {
+                1 -> value
+                else -> ArrayConst(value, scale.subList(1, scale.size))
+            }
+        }
+    )
+
+    override fun toString(): String {
+        val seq = value
+            .map {
+                when(it) {
+                    is ISimpleConstant -> "${it.type} $it"
+                    else -> "$it"
+                }
+            }
+            .reduce { acc, s -> "$acc, $s" }
+        return "[ $seq ]"
+    }
 }
+
+class StructConstant(
+    val value: List<Value>
+): Value(StructType(value.map { it.type })), IConstant {
+    override fun toString(): String {
+        val seq = value
+            .map {
+                when(it) {
+                    is ISimpleConstant -> "${it.type} $it"
+                    else -> "$it"
+                }
+            }
+            .reduce { acc, s -> "$acc, $s" }
+        return "{ $seq }"
+    }
+}
+
+class Empty(id: String): Value(VoidType) {
+    override fun toString(): String = ""
+}
+class Label(id: String): Value(LabelType, id) {
+    override fun toString(): String = "label %$id"
+    override val ir: String = "$id:"
+}
+
 

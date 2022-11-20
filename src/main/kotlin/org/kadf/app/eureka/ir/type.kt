@@ -15,7 +15,7 @@ object VoidType: Type {
 // IRType / FunctionType
 class FunctionType(
     val retType: Type,
-    val argType: List<Type>
+    val paraType: List<Type>
 ): Type
 
 // IRType / FirstClassTypes / SingleValueTypes / IntegerType
@@ -40,12 +40,22 @@ object LabelType: Type {
 
 // IRType / FirstClassTypes / AggregateTypes / ArrayType
 class ArrayType(
-    val type: Type,
-    val scale: List<Int>
+    val len: Int,
+    val subtype: Type
 ): Type {
-    override fun toString(): String {
-        return scale.fold("$type") { acc, i -> "[$i x $acc]" }
-    }
+
+    constructor(
+        type: Type,
+        scale: List<Int>
+    ) : this(
+        scale.first(),
+        when (scale.size) {
+            1 -> type
+            else -> ArrayType(type, scale.subList(1, scale.size))
+        }
+    )
+
+    override fun toString(): String = "[$len x $subtype]"
 }
 
 // IRType / FirstClassTypes / AggregateTypes / StructureType

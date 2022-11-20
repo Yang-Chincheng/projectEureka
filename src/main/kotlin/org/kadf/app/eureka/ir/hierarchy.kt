@@ -9,19 +9,23 @@ class Module
 class Function(
     val parentModule: Module,
     id: String,
-    type: Type
-): Value(id, type) {
-    override fun asOperand(): String = "${(type as FunctionType).retType} $id"
-    override fun toString(): String {
-        return "define ${asOperand()}()"
-    }
+    val funcType: FunctionType,
+    val argList: List<Value>
+): Value(funcType, id), IUser {
     val block: MutableList<BasicBlock> = mutableListOf()
+    init {
+        argList.forEach { it.addUser(this) }
+    }
+    override fun toString(): String = "@$id"
 }
 
-class BasicBlock(val parentFunction: Function) {
+class BasicBlock(
+    val parentFunction: Function,
+    val label: Label
+) {
     val pred: MutableList<BasicBlock> = mutableListOf()
     val succ: MutableList<BasicBlock> = mutableListOf()
-    val inst: MutableList<Instruction> = mutableListOf()
+    val inst: MutableList<IInstruction> = mutableListOf()
 }
 
 
