@@ -4,121 +4,124 @@ import org.kadf.app.eureka.MxStarParser.ArrayTypeContext
 import org.kadf.app.eureka.MxStarParser.DeclarableTypeContext
 import org.kadf.app.eureka.MxStarParser.NonVoidTypeContext
 import org.kadf.app.eureka.MxStarParser.ReturnableTypeContext
+import org.kadf.app.eureka.utils.DefaultErrorHandler
+import org.kadf.app.eureka.utils.ErrorHandler
 
-sealed interface IType {
-    fun typeId(): String
-    fun regiId(): String
-    fun match(other: IType): Boolean
+sealed class AstType {
+    abstract val typeId: String
+    abstract fun match(other: AstType): Boolean
 
+    companion object {
+        fun intersect(ty1: AstType?, ty2: AstType?, handler: ErrorHandler = DefaultErrorHandler): AstType? {
+            if (ty1 == null) return ty2
+            if (ty2 == null) return ty1
+            if (!ty1.match(ty2)) handler.report("type intersection failed")
+            if (ty1 is AstAnyType || ty1 is AstNullType) return ty2
+            if (ty2 is AstAnyType || ty2 is AstNullType) return ty1
+            return ty1
+        }
+    }
 }
 
-sealed interface INonVoidType : IType, IDeclarableType, IReturnableType
-sealed interface IDeclarableType : IType
-sealed interface IReturnableType : IType
-sealed interface INewableType : IType
-
-object AnyType: IType {
-    override fun typeId() = "any"
-    override fun regiId() = "any"
-    override fun match(other: IType) = true
+object AstAnyType : AstType() {
+    //    override fun typeId() = "any"
+    override val typeId = "any"
+    override fun match(other: AstType) = true
 }
 
-object NothingType: IType {
-    override fun typeId() = "nothing"
-    override fun regiId() = "nothing"
-    override fun match(other: IType) = false
+object AstNothingType : AstType() {
+    //    override fun typeId() = "nothing"
+    override val typeId = "nothing"
+    override fun match(other: AstType) = false
 }
 
 // First-Order Types
-object UnitType : IReturnableType {
-    override fun typeId() = "void"
-    override fun regiId() = "unit"
-    override fun match(other: IType) = other is UnitType
+object AstUnitType : AstType() {
+    //    override fun typeId() = "void"
+    override val typeId = "unit"
+    override fun match(other: AstType) = other is AstAnyType || other is AstUnitType
 }
 
-object NullType : IType {
-    override fun typeId() = "null"
-    override fun regiId() = "null"
-    override fun match(other: IType) =
-        other is NullType || other is ArrayType || other is UserDefinedType || other is AnyType
+object AstNullType : AstType() {
+    //    override fun typeId() = "null"
+    override val typeId = "null"
+    override fun match(other: AstType) =
+        other is AstAnyType || other is AstNullType || other is AstArrayType || other is AstUserDefType
 }
 
-object IntegerType : INonVoidType, IDeclarableType, IReturnableType {
-    override fun typeId() = "int"
-    override fun regiId() = "integer"
-    override fun match(other: IType) = other is IntegerType || other is AnyType
+object AstIntegerType : AstType() {
+    //    override fun typeId() = "int"
+    override val typeId = "integer"
+    override fun match(other: AstType) = other is AstAnyType || other is AstIntegerType
 }
 
-object BooleanType : INonVoidType, IDeclarableType, IReturnableType {
-    override fun typeId() = "bool"
-    override fun regiId() = "boolean"
-    override fun match(other: IType) = other is BooleanType || other is AnyType
+object AstBooleanType : AstType() {
+    //    override fun typeId() = "bool"
+    override val typeId = "boolean"
+    override fun match(other: AstType) = other is AstAnyType || other is AstBooleanType
 }
 
-object StringType : INonVoidType, IDeclarableType, IReturnableType {
-    override fun typeId() = "string"
-    override fun regiId() = "string"
-    override fun match(other: IType) = other is StringType || other is AnyType
+object AstStringType : AstType() {
+    //    override fun typeId() = "string"
+    override val typeId = "string"
+    override fun match(other: AstType) = other is AstAnyType || other is AstStringType
 }
 
-class UserDefinedType(private val id: String) :
-    INonVoidType, IDeclarableType, IReturnableType {
-    override fun typeId() = id
-    override fun regiId() = "def-$id"
-    override fun match(other: IType) =
-        (other is UserDefinedType && other.id == id) || other is NullType || other is AnyType
+class AstUserDefType(val id: String) : AstType() {
+    //    override fun typeId() = id
+    override val typeId = "def-$id"
+    override fun match(other: AstType) =
+        other is AstAnyType || other is AstNullType || (other is AstUserDefType && other.id == id)
 }
 
 // Second-Order Types
-class ArrayType(val type: INonVoidType, val dim: Int) :
-    IDeclarableType, IReturnableType {
+class AstArrayType(val type: AstType, val dim: Int) : AstType() {
     init {
         if (dim < 1) throw Exception()
     }
-    override fun typeId(): String = type.typeId() + "[]".repeat(dim)
-    override fun regiId() = "array"
-    override fun match(other: IType) =
-        (other is ArrayType && type.match(other.type) && dim == other.dim) || other is NullType || other is AnyType
+
+    //    override fun typeId(): String = type.typeId() + "[]".repeat(dim)
+    override val typeId = "array"
+    override fun match(other: AstType) =
+        other is AstAnyType || other is AstNullType || (other is AstArrayType && type.match(other.type) && dim == other.dim)
 }
 
-class FunctionType(val retType: IReturnableType, val paraTypes: List<IDeclarableType>): IType {
-    override fun typeId(): String {
-        val paraId = paraTypes.map { it.typeId() }.reduce { acc, t -> "$acc, $t" }
-        return "($paraId) -> ${retType.typeId()}"
-    }
-    override fun regiId() = "function"
-    override fun match(other: IType) =
-        other is FunctionType && retType.match(other.retType)
+class AstFuncType(val retType: AstType, val paraTypes: List<AstType>) : AstType() {
+    constructor(vararg type: AstType) : this(type[0], type.drop(1))
+
+    override val typeId = "function"
+    override fun match(other: AstType) =
+        other is AstFuncType && retType.match(other.retType)
                 && paraTypes.zip(other.paraTypes).all { p -> p.first.match(p.second) }
+
+    fun invocable(args: List<AstType>): Boolean =
+        paraTypes.size == args.size && paraTypes.zip(args).all { it.first.match(it.second) }
 }
 
-val NonVoidTypeContext.type: INonVoidType
+val NonVoidTypeContext.type: AstType
     get() = when {
-        Int() != null -> IntegerType
-        Bool() != null -> BooleanType
-        String() != null -> StringType
-        Identifier() != null -> UserDefinedType(Identifier().text)
+        Int() != null -> AstIntegerType
+        Bool() != null -> AstBooleanType
+        String() != null -> AstStringType
+        Identifier() != null -> AstUserDefType(Identifier().text)
         else -> throw Exception()
     }
 
-val DeclarableTypeContext.type: IDeclarableType
+val DeclarableTypeContext.type: AstType
     get() = when {
         nonVoidType() != null -> nonVoidType().type
         arrayType() != null -> arrayType().type
         else -> throw Exception()
     }
 
-val ReturnableTypeContext.type: IReturnableType
+val ReturnableTypeContext.type: AstType
     get() = when {
-        Void() != null -> UnitType
+        Void() != null -> AstUnitType
         nonVoidType() != null -> nonVoidType().type
         arrayType() != null -> arrayType().type
         else -> throw Exception()
     }
 
-val ArrayTypeContext.type: ArrayType
-    get() = ArrayType(nonVoidType().type, total.size)
-
-
-
+val ArrayTypeContext.type: AstType
+    get() = AstArrayType(nonVoidType().type, total.size)
 

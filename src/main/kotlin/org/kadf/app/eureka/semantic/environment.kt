@@ -1,126 +1,200 @@
 package org.kadf.app.eureka.semantic
 
 import org.kadf.app.eureka.ast.*
-import org.kadf.app.eureka.ast.nodes.ASTNode
+import org.kadf.app.eureka.ast.nodes.AstNode
+import org.kadf.app.eureka.ir.IrValue
+import org.kadf.app.eureka.utils.DefaultErrorHandler
+import org.kadf.app.eureka.utils.ErrorHandler
 
-open class Environment<B>(
-    val outer: Environment<B>?,
-    vararg init: Pair<String, B>
-) {
-    private val bindings = hashMapOf(*init)
-    var capture = true
+class TypeBinding {
+    val properties = mutableMapOf<String, AstType>()
+    val methods = mutableMapOf<String, AstFuncType>()
 
-    val isGlobal get() = outer == null
+//    fun print() {
+//        println("[property]")
+//        properties.forEach { (s, astType) -> println("$s with $astType") }
+//        println("[method]")
+//        methods.forEach { (s, astFuncType) -> println("$s with $astFuncType") }
+//    }
+}
 
-    open fun contain(id: String) = bindings[id] != null
+class TypeEnv {
+    private val bindings = mutableMapOf<String, TypeBinding>()
 
-    open fun lookup(id: String): B? {
-        return bindings[id] ?: if(capture) outer?.lookup(id) else null
+    fun contain(id: String) = bindings[id] != null
+    fun containType(type: AstType): Boolean = when (type) {
+        is AstArrayType -> containType(type.type)
+        is AstFuncType -> containType(type.retType) && type.paraTypes.all { containType(it) }
+        else -> contain(type.typeId)
     }
 
-    open fun register(id: String, binding: B): Boolean {
-        if (bindings.contains(id)) throw Exception("registry failed")
-        return true.also { bindings[id] = binding }
+    private fun lookup(id: String): TypeBinding? = bindings[id]
+    fun lookupType(type: AstType) = lookup(type.typeId)
+    fun lookupProp(type: AstType, id: String): AstType? = lookupType(type)?.properties?.get(id)
+    fun lookupMeth(type: AstType, id: String): AstFuncType? = lookupType(type)?.methods?.get(id)
+
+
+    fun register(id: String, binding: TypeBinding, handler: ErrorHandler = DefaultErrorHandler) {
+        if (bindings.contains(id)) handler.report("duplicate declaration of type $id")
+        bindings[id] = binding
+    }
+
+    fun registerType(type: AstType, handler: ErrorHandler = DefaultErrorHandler) {
+        register(type.typeId, TypeBinding(), handler)
+    }
+
+    fun registerProp(type: AstType, id: String, pType: AstType, handler: ErrorHandler = DefaultErrorHandler) {
+        lookupType(type)?.properties?.let {
+            if (it.contains(id)) handler.report("duplicate declaration of property $id")
+            it[id] = pType
+        } ?: run {
+            handler.report("try registering property of an nonexistent type")
+        }
+
+    }
+
+    fun registerMeth(type: AstType, id: String, mType: AstFuncType, handler: ErrorHandler) {
+        lookupType(type)?.methods?.let {
+            if (it.contains(id)) handler.report("duplicate declaration of method $id")
+            it[id] = mType
+        } ?: run {
+            handler.report("try registering method of an nonexistent type")
+        }
     }
 }
 
-typealias TypeBinding = VarEnv
-typealias VarBinding = IType
-
-class TypeEnv: Environment<TypeBinding>(null) {
-    init {
-        register("array", TypeBinding(null))
-        register("string", TypeBinding(null))
-        register("unit", TypeBinding(null))
-        register("null", TypeBinding(null))
-        register("integer", TypeBinding(null))
-        register("boolean", TypeBinding(null))
-        register("function", TypeBinding(null))
-    }
-
-    fun containType(type: IType): Boolean = when(type) {
-        is ArrayType -> containType(type.type)
-        is FunctionType -> containType(type.retType) && type.paraTypes.all { containType(it) }
-        else -> super.contain(type.regiId())
-    }
-//    fun containID(id: String): Boolean = containType(UserDefinedType(id))
-    fun lookupType(type: IType) = super.lookup(type.regiId())
-    fun registerType(type: IType, env: VarEnv) = super.register(type.regiId(), env)
+class VarBinding(
+    val type: AstType
+) {
+    lateinit var value: IrValue
 }
 
 class VarEnv(
-    outer: Environment<VarBinding>?,
-    val node: ASTNode? = null,
-    vararg init: Pair<String, VarBinding>
-): Environment<VarBinding>(outer, *init) {
-    fun containVar(id: String) = super.contain("var-$id")
-    fun containFun(id: String) = super.contain("fun-$id")
-    fun lookupVar(id: String) = super.lookup("var-$id") as? IDeclarableType
-    fun lookupFun(id: String) = super.lookup("fun-$id") as? FunctionType
-    fun registerVar(tEnv: TypeEnv, id: String, type: IDeclarableType) {
-        if (tEnv.contain("def-$id")) throw Exception("registry id conflict with type id")
-        super.register("var-$id", type)
-    }
-    fun registerFun(tEnv: TypeEnv, id: String, type: FunctionType) {
-        if (tEnv.contain("def-$id")) throw Exception("registry id conflict with type id")
-        super.register("fun-$id", type)
-    }
+    val outer: VarEnv?,
+    val node: AstNode? = null,
+    typeEnv: TypeEnv? = null
+) {
+    var capture = true
+    private val bindings = mutableMapOf<String, VarBinding>()
+    val tEnv: TypeEnv = typeEnv ?: outer!!.tEnv
 
+    val isGlobal get() = outer == null
     var isClass = false
     var isFunction = false
     var isLoop = false
     var isLambda = false
-    var inferredReturnType: IType? = null
-
-    private val outerEnv: List<VarEnv> get() {
-        var env = this
-        val ret = mutableListOf<VarEnv>()
-        while(env.outer != null) {
-            ret.add(env)
-            env = env.outer as VarEnv
+    var returnType: AstType? = null
+    private val outerEnv: List<VarEnv>
+        get() {
+            var env = this
+            val ret = mutableListOf<VarEnv>()
+            while (env.outer != null) {
+                ret.add(env)
+                env = env.outer!!
+            }
+            return ret
         }
-        return ret
+
+    private fun contain(id: String) = bindings[id] != null
+    fun containVar(id: String) = contain("var-$id")
+    fun containFun(id: String) = contain("fun-$id")
+
+    private fun lookup(id: String): VarBinding? {
+        return bindings[id] ?: if (capture) outer?.lookup(id) else null
     }
+
+    fun getVarType(id: String) = lookup("var-$id")?.type
+    fun getFunType(id: String) = lookup("fun-$id")?.type as? AstFuncType
+
+    fun getVarValue(id: String) = lookup("var-$id")?.value
+    fun getFunValue(id: String) = lookup("fun-$id")?.value
+    fun setVarValue(id: String, value: IrValue) {
+        lookup("var-$id")?.let { it.value = value }
+    }
+
+    fun setFunValue(id: String, value: IrValue) {
+        lookup("fun-$id")?.let { it.value = value }
+    }
+
+    private fun register(id: String, binding: VarBinding, handler: ErrorHandler = DefaultErrorHandler) {
+        if (bindings.contains(id)) handler.report("registry failed")
+        bindings[id] = binding
+    }
+
+    fun registerVar(id: String, type: AstType, handler: ErrorHandler = DefaultErrorHandler) {
+        if (tEnv.contain("def-$id")) handler.report("registry id conflict with type id")
+        register("var-$id", VarBinding(type), handler)
+    }
+
+    fun registerFun(id: String, type: AstFuncType, handler: ErrorHandler = DefaultErrorHandler) {
+        if (tEnv.contain("def-$id")) handler.report("registry id conflict with type id")
+        register("fun-$id", VarBinding(type), handler)
+    }
+
     val outerFunc get() = outerEnv.firstOrNull { it.isFunction }
     val outerClass get() = outerEnv.firstOrNull { it.isClass }
     val outerLambda get() = outerEnv.firstOrNull { it.isLambda }
     val outerLoop get() = outerEnv.firstOrNull { it.isLoop }
+//    fun isMemberVar(id: String): Boolean {
+//        return outerEnv.firstOrNull { it.containVar(id) }?.isClass ?: false
+//    }
+//
+//    fun isMemberFun(id: String): Boolean {
+//        return outerEnv.firstOrNull { it.containFun(id) }?.isClass ?: false
+//    }
+    fun print() {
+        println("[bindings]")
+        bindings.keys.forEach { print("$it ") }
+        println("\n")
+    }
 }
 
-class EnvManager(tEnv: TypeEnv) {
+class EnvManager(root: AstNode, tEnv: TypeEnv) {
 
-    val global = VarEnv(null)
+    val global = VarEnv(null, root, tEnv)
     var current = global
 
     init {
-        global.registerFun(tEnv, "print", FunctionType(UnitType, listOf(StringType)))
-        global.registerFun(tEnv, "println", FunctionType(UnitType, listOf(StringType)))
-        global.registerFun(tEnv, "printInt", FunctionType(UnitType, listOf(IntegerType)))
-        global.registerFun(tEnv, "printlnInt", FunctionType(UnitType, listOf(IntegerType)))
-        global.registerFun(tEnv, "getString", FunctionType(StringType, listOf()))
-        global.registerFun(tEnv, "getInt", FunctionType(IntegerType, listOf()))
-        global.registerFun(tEnv, "toString", FunctionType(StringType, listOf(IntegerType)))
-
-        tEnv.lookup("array")!!.registerFun(tEnv, "size", FunctionType(IntegerType, listOf()))
-        tEnv.lookup("string")!!.apply {
-            registerFun(tEnv, "length", FunctionType(IntegerType, listOf()))
-            registerFun(tEnv, "substring", FunctionType(StringType, listOf(IntegerType, IntegerType)))
-            registerFun(tEnv, "parseInt", FunctionType(IntegerType, listOf()))
-            registerFun(tEnv, "ord", FunctionType(IntegerType, listOf(IntegerType)))
+        val arrayTypeBinding = TypeBinding().apply {
+            methods["size"] = AstFuncType(AstIntegerType)
         }
+        val stringTypeBinding = TypeBinding().apply {
+            methods["length"] = AstFuncType(AstIntegerType)
+            methods["substring"] = AstFuncType(AstStringType, AstIntegerType, AstIntegerType)
+            methods["parseInt"] = AstFuncType(AstIntegerType)
+            methods["ord"] = AstFuncType(AstIntegerType, AstIntegerType)
+        }
+        tEnv.apply {
+            register("array", arrayTypeBinding)
+            register("string", stringTypeBinding)
+            register("unit", TypeBinding())
+            register("null", TypeBinding())
+            register("integer", TypeBinding())
+            register("boolean", TypeBinding())
+            register("function", TypeBinding())
+            register("any", TypeBinding())
+            register("nothing", TypeBinding())
+        }
+
+        global.registerFun("print", AstFuncType(AstUnitType, AstStringType))
+        global.registerFun("println", AstFuncType(AstUnitType, AstStringType))
+        global.registerFun("printInt", AstFuncType(AstUnitType, AstIntegerType))
+        global.registerFun("printlnInt", AstFuncType(AstUnitType, AstIntegerType))
+        global.registerFun("getString", AstFuncType(AstStringType))
+        global.registerFun("getInt", AstFuncType(AstIntegerType))
+        global.registerFun("toString", AstFuncType(AstStringType, AstIntegerType))
+
     }
 
-    fun enter(node: ASTNode? = null): VarEnv {
+    fun enter(node: AstNode? = null): VarEnv {
         current = VarEnv(current, node)
         return current
     }
+
     fun leave(): VarEnv {
-        current = current.outer as? VarEnv?: global
+        current = current.outer ?: global
         return current
     }
 
-//    fun checkVar(id: String) = !type.containType(UserDefinedType(id)) && !current.containVar(id)
-//    fun checkFun(id: String) = !type.containType(UserDefinedType(id)) && !current.containFun(id)
-//    fun registerVar(id: String, tp: IDeclarableType) = if (type.checkType(tp)) current.registerVar(id, tp) else throw Exception()
-//    fun registerFun(id: String, tp: FunctionType) = if (type.checkType(tp)) current.registerFun(id, tp) else throw Exception()
 }
+

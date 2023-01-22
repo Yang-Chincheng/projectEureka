@@ -3,118 +3,124 @@ package org.kadf.app.eureka.ast.nodes
 import org.kadf.app.eureka.utils.CodeContext
 import org.kadf.app.eureka.ast.*
 
-sealed interface IExpression: IForLoopInit
-//sealed interface ILValueExpression : IExpression
-//sealed interface IRValueExpression : IExpression
-
-class LiteralNode(
+class AstLiteralNode(
     ctx: CodeContext,
-    val type: IType,
+    val type: AstType,
     val literal: String
-) : ASTNode(ctx), IExpression {
+) : AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class VariableExprNode(
+class AstVariableExprNode(
     ctx: CodeContext,
     val id: String
-) : ASTNode(ctx), IExpression {
+) : AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class InvocationExprNode(
+class AstInvocationExprNode(
     ctx: CodeContext,
-    val func: String,
-    val args: List<IExpression>
-): ASTNode(ctx), IExpression {
+    val funcId: String,
+    val args: List<AstNode>
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class PropertyExprNode(
+class AstPropertyExprNode(
     ctx: CodeContext,
-    val obj: IExpression,
+    val obj: AstNode,
     val id: String
-): ASTNode(ctx), IExpression {
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class MethodExprNode(
+class AstMethodExprNode(
     ctx: CodeContext,
-    val obj: IExpression,
-    val func: String,
-    val args: List<IExpression>
-): ASTNode(ctx), IExpression {
+    val obj: AstNode,
+    val funcId: String,
+    val args: List<AstNode>
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class IndexExprNode(
+class AstIndexExprNode(
     ctx: CodeContext,
-    val arr: IExpression,
-    val idx: IExpression
-) : ASTNode(ctx), IExpression {
+    val arr: AstNode,
+    val idx: AstNode
+) : AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class LambdaExprNode(
+class AstLambdaExprNode(
     ctx: CodeContext,
     val cap: Boolean,
-    val type: FunctionType,
+    val type: AstFuncType,
     val ids: List<String>,
-    val body: List<IStatement>,
-    val args: List<IExpression>
-) : ASTNode(ctx), IExpression {
+    val body: List<AstNode>,
+    val args: List<AstNode>
+) : AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class AssignExprNode(
+class AstAssignExprNode(
     ctx: CodeContext,
-    val lhs: IExpression,
-    val rhs: IExpression
-) : ASTNode(ctx), IExpression {
+    val lhs: AstNode,
+    val rhs: AstNode
+) : AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class CompoundExprNode(
+class AstCompoundExprNode(
     ctx: CodeContext,
-    val rest: List<IExpression>,
-    val last: IExpression
-): ASTNode(ctx), IExpression {
+    val rest: List<AstNode>,
+    val last: AstNode
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-sealed interface INewableSyntax: IExpression
-
-class NewArrayNode(
+class AstNewArrayNode(
     ctx: CodeContext,
-    val type: ArrayType,
-    val scales: List<IExpression?>
-): ASTNode(ctx), INewableSyntax {
+    val type: AstArrayType,
+    val scales: List<AstNode?>
+): AstNode(ctx) {
     init {
         if (scales.size > type.dim) throw Exception()
     }
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class NewObjectNode(
+class AstNewObjectNode(
     ctx: CodeContext,
-    val type: IDeclarableType
-): ASTNode(ctx), INewableSyntax {
+    val type: AstType
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class UnaryExprNode(
+class AstUnaryExprNode(
     ctx: CodeContext,
-    val expr: IExpression,
+    val expr: AstNode,
     val op: Operator
-): ASTNode(ctx), IExpression {
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class BinaryExprNode(
+class AstBinaryExprNode(
     ctx: CodeContext,
-    val lhs: IExpression,
-    val rhs: IExpression,
+    val lhs: AstNode,
+    val rhs: AstNode,
     val op: Operator
-): ASTNode(ctx), IExpression {
+): AstNode(ctx) {
+    private fun isLast() = rhs !is AstBinaryExprNode || rhs.op != op
+    fun collect(): List<AstNode> {
+        var cur = this
+        val ret = mutableListOf<AstNode>()
+        while(!cur.isLast()) {
+            ret.add(cur.lhs)
+            cur = cur.rhs as AstBinaryExprNode
+        }
+        ret.add(cur.lhs)
+        ret.add(cur.rhs)
+        return ret
+    }
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }

@@ -3,41 +3,45 @@ package org.kadf.app.eureka.ast.nodes
 import org.kadf.app.eureka.utils.CodeContext
 import org.kadf.app.eureka.ast.*
 
-class VarDeclNode(
+class AstVarDeclNode(
     ctx: CodeContext,
-    val type: IDeclarableType,
+    val type: AstType,
     val ids: List<String>,
-    val inits: List<IExpression?>
-): ASTNode(ctx), IDeclaration, IStatement, IClassMember, IForLoopInit {
+    val inits: List<AstNode?>
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class ClassDeclNode(
+class AstClassDeclNode(
     ctx: CodeContext,
     val id: String,
-    val type: UserDefinedType,
-    val member: List<IClassMember>
-): ASTNode(ctx), IDeclaration {
+    val type: AstUserDefType,
+    val member: List<AstNode>
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-sealed interface IClassMember
+//sealed interface AstClassMember
 
-class ConstrNode(
+//sealed interface AstFunction {
+//    val body: List<AstNode>
+//}
+
+class AstConstrNode(
     ctx: CodeContext,
     val id: String,
-    val body: List<IStatement>
-): ASTNode(ctx), IClassMember {
+    val body: List<AstNode>
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class FuncDeclNode(
+class AstFuncDeclNode(
     ctx: CodeContext,
-    val id: String,
-    val type: FunctionType,
-    val ids: List<String>,
-    val body: List<IStatement>
-): ASTNode(ctx), IDeclaration, IClassMember {
+    val funcId: String,
+    val type: AstFuncType,
+    val paraId: List<String>,
+    val body: List<AstNode>
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 

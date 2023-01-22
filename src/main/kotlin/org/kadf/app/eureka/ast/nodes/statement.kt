@@ -3,75 +3,75 @@ package org.kadf.app.eureka.ast.nodes
 import org.kadf.app.eureka.utils.CodeContext
 import org.kadf.app.eureka.ast.ASTVisitor
 
-sealed interface IStatement
-
-class EmptyStmtNode(
+class AstEmptyStmtNode(
     ctx: CodeContext
-): ASTNode(ctx), IStatement {
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class BlockStmtNode(
+class AstBlockStmtNode(
     ctx: CodeContext,
-    val stmts: List<IStatement>
-): ASTNode(ctx), IStatement {
+    val stmts: List<AstNode>
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class VarDeclStmtNode(
+class AstVarDeclStmtNode(
     ctx: CodeContext,
-    val decl: VarDeclNode
-): ASTNode(ctx), IStatement {
+    val decl: AstVarDeclNode
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class ExprStmtNode(
+class AstExprStmtNode(
     ctx: CodeContext,
-    val expr: IExpression
-): ASTNode(ctx), IStatement {
+    val expr: AstNode
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class BranchStmtNode(
+class AstBranchStmtNode(
     ctx: CodeContext,
-    val cond: IExpression,
-    val thenBody: IStatement,
-    val elseBody: IStatement?
-): ASTNode(ctx), IStatement {
+    val cond: AstNode,
+    val thenBody: AstNode,
+    val elseBody: AstNode?
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-sealed interface IForLoopInit
+//sealed interface AstForLoopInit
+//val AstForLoopInit.astType get() = (this as AstNode).astType
+//val AstForLoopInit.env get() = (this as AstNode).env
 
-class ForLoopStmtNode(
+class AstForLoopStmtNode(
     ctx: CodeContext,
-    val init: IForLoopInit?,
-    val cond: IExpression?,
-    val iter: IExpression?,
-    val body: IStatement
-): ASTNode(ctx), IStatement {
+    val init: AstNode?,
+    val cond: AstNode?,
+    val iter: AstNode?,
+    val body: AstNode
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class WhileLoopStmtNode(
+class AstWhileLoopStmtNode(
     ctx: CodeContext,
-    val cond: IExpression,
-    val body: IStatement
-): ASTNode(ctx), IStatement {
+    val cond: AstNode,
+    val body: AstNode
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class ControlStmtNode(
+class AstControlStmtNode(
     ctx: CodeContext,
     val ctrl: String
-): ASTNode(ctx), IStatement {
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-class ReturnStmtNode(
+class AstReturnStmtNode(
     ctx: CodeContext,
-    val value: IExpression?
-): ASTNode(ctx), IStatement {
+    val value: AstNode? = null
+): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
