@@ -9,13 +9,6 @@ import org.kadf.app.eureka.utils.ErrorHandler
 class TypeBinding {
     val properties = mutableMapOf<String, AstType>()
     val methods = mutableMapOf<String, AstFuncType>()
-
-//    fun print() {
-//        println("[property]")
-//        properties.forEach { (s, astType) -> println("$s with $astType") }
-//        println("[method]")
-//        methods.forEach { (s, astFuncType) -> println("$s with $astFuncType") }
-//    }
 }
 
 class TypeEnv {
@@ -77,8 +70,7 @@ class VarEnv(
     var capture = true
     private val bindings = mutableMapOf<String, VarBinding>()
     val tEnv: TypeEnv = typeEnv ?: outer!!.tEnv
-
-    val isGlobal get() = outer == null
+    
     var isClass = false
     var isFunction = false
     var isLoop = false
@@ -142,11 +134,7 @@ class VarEnv(
 //    fun isMemberFun(id: String): Boolean {
 //        return outerEnv.firstOrNull { it.containFun(id) }?.isClass ?: false
 //    }
-    fun print() {
-        println("[bindings]")
-        bindings.keys.forEach { print("$it ") }
-        println("\n")
-    }
+//
 }
 
 class EnvManager(root: AstNode, tEnv: TypeEnv) {

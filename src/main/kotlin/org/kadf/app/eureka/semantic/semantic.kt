@@ -18,13 +18,11 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     fun check(node: AstNode) = visit(node as AstProgramNode)
 
     override fun visit(node: AstProgramNode) {
-//        println("@program")
         node.env = vEnv.current
         // type registry
         node.decls
             .filterIsInstance<AstClassDeclNode>()
             .forEach {
-//                tEnv.registerType(it.type)
                 tEnv.registerType(it.type) { msg -> reportError(node.ctx, msg) }
             }
 
@@ -66,8 +64,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstVarDeclNode) {
-//        println("@var decl")
-
         node.env = vEnv.current
         // type registry check
         if (!tEnv.containType(node.type))
@@ -84,13 +80,9 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 node.env.registerVar(it, node.type) { msg -> reportError(node.ctx, msg) }
             }
         }
-//        println("${node.ctx.start}, ${node.ctx.stop}")
-//        node.env.print()
     }
 
     override fun visit(node: AstFuncDeclNode) {
-//        println("@func decl")
-
         // main function check
         if (node.funcId == "main") {
             if (node.type.retType !is AstIntegerType)
@@ -121,7 +113,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstClassDeclNode) {
-//        println("@class decl")
         // enter environment
         node.env = vEnv.enter(node).apply { isClass = true }
         node.member
@@ -149,8 +140,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstConstrNode) {
-//        println("@constructor")
-
         node.env = vEnv.enter(node).apply { isFunction = true }
         // traverse
         node.body.forEach { visit(it) }
@@ -162,7 +151,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstBlockStmtNode) {
-//        println("@block stmt")
         node.env = vEnv.enter(node)
         node.stmts.forEach { visit(it) }
         vEnv.leave()
@@ -187,8 +175,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstForLoopStmtNode) {
-//        println("@for loop")
-
         node.env = vEnv.current
         // condition type check
         node.cond?.let {
@@ -227,10 +213,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstReturnStmtNode) {
-//        println("@return stmt")
-
         node.env = vEnv.current
-
         // get return value type
         val retType = node.value?.let { visit(it); it.astType } ?: AstUnitType
         // priority: lambda > function
@@ -279,8 +262,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstVariableExprNode): Boolean {
-//        println("@variable expr")
-
         // variable registry check
         node.env = vEnv.current
 //        node.env.print()
@@ -321,11 +302,8 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstIndexExprNode): Boolean {
-//        println("@indexing")
-
         node.env = vEnv.current
         visit(node.arr)
-//        println("[dbg] ${node.arr.astType.typeId}")
         if (node.arr.astType !is AstArrayType)
             reportError(node.ctx, "only arrays are allowed for indexing")
         visit(node.idx)
@@ -368,8 +346,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     }
 
     override fun visit(node: AstAssignExprNode): Boolean {
-//        println("@assign expr")
-
         node.env = vEnv.current
         if (!(visit(node.lhs) as Boolean))
             reportError(node.ctx, "assigning to a non-left-handed value")
@@ -489,7 +465,6 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         if (scaleType.any { !AstIntegerType.match(it) }) {
             reportError(node.ctx, "new expression with illegal array dimension scales")
         }
-//        println("[dbg] new array, ${node.type.typeId} ${node.type.type.typeId}")
         node.astType = node.type
         return false
     }
