@@ -15,7 +15,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     private val tEnv = TypeEnv()
     private val vEnv = EnvManager(root, tEnv)
 
-    fun check(node: AstNode) = visit(node as AstProgramNode)
+    fun check(node: AstNode) { (node as AstProgramNode).accept(this) }
 
     override fun visit(node: AstProgramNode) {
         node.env = vEnv.current
@@ -60,7 +60,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
             }
 
         // start semantic check
-        node.decls.forEach { visit(it) }
+        node.decls.forEach { it.accept(this) }
     }
 
     override fun visit(node: AstVarDeclNode) {
@@ -71,7 +71,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         // initialization expression type check
         val initType = node.inits
             .filterNotNull()
-            .map { visit(it); it.astType }
+            .map { it.accept(this); it.astType }
         if (initType.any { !node.type.match(it) })
             reportError(node.ctx, "type of variable initialization failed to match the declared one")
         if (!vEnv.current.isClass) {
@@ -99,7 +99,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 node.env.registerVar(it.first, it.second) { msg -> reportError(node.ctx, msg) }
             }
         // traverse
-        node.body.forEach { visit(it) }
+        node.body.forEach { it.accept(this) }
         // return check
         node.env.returnType?.let {
             if (!it.match(node.type.retType))
@@ -134,7 +134,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         if (constr.isNotEmpty() && constr.first().id != node.id)
             reportError(node.ctx, "constructor is required to have the same identifier with the class")
         // traverse
-        node.member.forEach { visit(it) }
+        node.member.forEach { it.accept(this) }
         // remove environment
         vEnv.leave()
     }
@@ -142,7 +142,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     override fun visit(node: AstConstrNode) {
         node.env = vEnv.enter(node).apply { isFunction = true }
         // traverse
-        node.body.forEach { visit(it) }
+        node.body.forEach { it.accept(this) }
         // return type check
         if (vEnv.current.returnType?.match(AstUnitType) == false)
             reportError(node.ctx, "constructor return type mismatching")
@@ -152,24 +152,24 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstBlockStmtNode) {
         node.env = vEnv.enter(node)
-        node.stmts.forEach { visit(it) }
+        node.stmts.forEach { it.accept(this) }
         vEnv.leave()
     }
 
     override fun visit(node: AstBranchStmtNode) {
         node.env = vEnv.current
         // condition type check
-        visit(node.cond)
+        node.cond.accept(this)
         if (!AstBooleanType.match(node.cond.astType))
             reportError(node.ctx, "branch condition expression is required to have <bool> type")
         // environment for then block
         vEnv.enter()
-        visit(node.thenBody)
+        node.thenBody.accept(this)
         vEnv.leave()
         // environment for else block
         node.elseBody?.let {
             vEnv.enter()
-            visit(it)
+            it.accept(this)
             vEnv.leave()
         }
     }
@@ -178,16 +178,16 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         node.env = vEnv.current
         // condition type check
         node.cond?.let {
-            visit(it)
+            it.accept(this)
             if (!AstBooleanType.match(it.astType))
                 reportError(node.ctx, "for loop condition expression is required to have <bool> type")
         }
         // create environment
         vEnv.enter(node).apply { isLoop = true }
         // traverse
-        node.init?.let { visit(it) }
-        node.iter?.let { visit(it) }
-        visit(node.body)
+        node.init?.accept(this)
+        node.iter?.accept(this)
+        node.body.accept(this)
         // remove environment
         vEnv.leave()
     }
@@ -195,13 +195,13 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     override fun visit(node: AstWhileLoopStmtNode) {
         node.env = vEnv.current
         // condition type check
-        visit(node.cond)
+        node.cond.accept(this)
         if (!AstBooleanType.match(node.cond.astType))
             reportError(node.ctx, "while loop condition expression is required to have <bool> type")
         // create environment
         vEnv.enter(node).apply { isLoop = true }
         // traverse
-        visit(node.body)
+        node.body.accept(this)
         // remove environment
         vEnv.leave()
     }
@@ -215,7 +215,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     override fun visit(node: AstReturnStmtNode) {
         node.env = vEnv.current
         // get return value type
-        val retType = node.value?.let { visit(it); it.astType } ?: AstUnitType
+        val retType = node.value?.let { it.accept(this); it.astType } ?: AstUnitType
         // priority: lambda > function
         with(vEnv.current.outerLambda) {
             if (this != null) {
@@ -233,7 +233,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstExprStmtNode) {
         node.env = vEnv.current
-        visit(node.expr)
+        node.expr.accept(this)
         node.astType = node.expr.astType
     }
 
@@ -243,7 +243,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstVarDeclStmtNode) {
         node.env = vEnv.current
-        visit(node.decl)
+        node.decl.accept(this)
     }
 
     override fun visit(node: AstLiteralNode): Boolean {
@@ -274,7 +274,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         node.env = vEnv.current
         val funcType = node.env.getFunType(node.funcId)
             ?: reportError(node.ctx, "invocation of undeclared function ${node.funcId}")
-        val argsType = node.args.map { visit(it); it.astType }
+        val argsType = node.args.map { it.accept(this); it.astType }
         if (!funcType.invocable(argsType))
             reportError(node.ctx, "function invocation argument mismatching")
         node.astType = funcType.retType
@@ -283,7 +283,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstPropertyExprNode): Boolean {
         node.env = vEnv.current
-        visit(node.obj)
+        node.obj.accept(this)
         node.astType = tEnv.lookupProp(node.obj.astType, node.id)
             ?: reportError(node.ctx, "missing property named <${node.id}>")
         return true
@@ -291,10 +291,10 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstMethodExprNode): Boolean {
         node.env = vEnv.current
-        visit(node.obj)
+        node.obj.accept(this)
         val funcType = tEnv.lookupMeth(node.obj.astType, node.funcId)
             ?: reportError(node.ctx, "missing method named <${node.funcId}>")
-        val argsType = node.args.map { visit(it); it.astType }
+        val argsType = node.args.map { it.accept(this); it.astType }
         if (!funcType.invocable(argsType))
             reportError(node.ctx, "method invocation argument mismatching")
         node.astType = funcType.retType
@@ -303,10 +303,10 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstIndexExprNode): Boolean {
         node.env = vEnv.current
-        visit(node.arr)
+        node.arr.accept(this)
         if (node.arr.astType !is AstArrayType)
             reportError(node.ctx, "only arrays are allowed for indexing")
-        visit(node.idx)
+        node.idx.accept(this)
         if (node.idx.astType !is AstIntegerType)
             reportError(node.ctx, "indexing expression is required to have <int> type")
         val arrType = node.arr.astType as AstArrayType
@@ -334,9 +334,9 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 node.env.registerVar(it.first, it.second) { msg -> reportError(node.ctx, msg) }
             }
         // body traverse
-        node.body.forEach { visit(it) }
+        node.body.forEach { it.accept(this) }
         // argument type check
-        val argsType = node.args.map { visit(it); it.astType }
+        val argsType = node.args.map { it.accept(this); it.astType }
         if (!node.type.invocable(argsType))
             reportError(node.ctx, "lambda expression invocation argument mismatching")
         // return type check
@@ -347,9 +347,9 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstAssignExprNode): Boolean {
         node.env = vEnv.current
-        if (!(visit(node.lhs) as Boolean))
+        if (!(node.lhs.accept(this) as Boolean))
             reportError(node.ctx, "assigning to a non-left-handed value")
-        visit(node.rhs)
+        node.rhs.accept(this)
         if (!node.lhs.astType.match(node.rhs.astType))
             reportError(node.ctx, "assignment type mismatching")
         node.astType = node.lhs.astType
@@ -358,15 +358,15 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstCompoundExprNode): Boolean {
         node.env = vEnv.current
-        node.rest.forEach { visit(it) }
-        val lastIsLeftValue = visit(node.last) as Boolean
+        node.rest.forEach { it.accept(this) }
+        val lastIsLeftValue = node.last.accept(this) as Boolean
         node.astType = node.last.astType
         return lastIsLeftValue
     }
 
     override fun visit(node: AstUnaryExprNode): Boolean {
         node.env = vEnv.current
-        val exprIsLeftValue = visit(node.expr) as Boolean
+        val exprIsLeftValue = node.expr.accept(this) as Boolean
         when (node.op) {
             Operator.PRE_INC, Operator.PRE_DEC -> {
                 if (!exprIsLeftValue)
@@ -406,8 +406,8 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstBinaryExprNode): Boolean {
         node.env = vEnv.current
-        visit(node.lhs)
-        visit(node.rhs)
+        node.lhs.accept(this)
+        node.rhs.accept(this)
         if (!node.lhs.astType.match(node.rhs.astType))
             reportError(node.ctx, "left-hand and right-hand sides type mismatching")
         when (node.op) {
@@ -461,7 +461,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
             reportError(node.ctx, "new expression with illegal array dimension scales")
         val scaleType = node.scales
             .filterNotNull()
-            .map { visit(it); it.astType }
+            .map { it.accept(this); it.astType }
         if (scaleType.any { !AstIntegerType.match(it) }) {
             reportError(node.ctx, "new expression with illegal array dimension scales")
         }
