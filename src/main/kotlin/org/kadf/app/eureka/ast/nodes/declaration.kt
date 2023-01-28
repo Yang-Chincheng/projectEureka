@@ -9,6 +9,8 @@ class AstVarDeclNode(
     val ids: List<String>,
     val inits: List<AstNode?>
 ): AstNode(ctx) {
+    val declInfo = ids.zip(inits)
+    var isGlobal: Boolean = false
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
@@ -21,27 +23,31 @@ class AstClassDeclNode(
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
-//sealed interface AstClassMember
-
-//sealed interface AstFunction {
-//    val body: List<AstNode>
-//}
-
 class AstConstrNode(
     ctx: CodeContext,
     val id: String,
     val body: List<AstNode>
 ): AstNode(ctx) {
+    var memberOf: AstType? = null
+    val isGloabl: Boolean = memberOf == null
+    var hasReturned: Boolean = false
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
 class AstFuncDeclNode(
     ctx: CodeContext,
     val funcId: String,
-    val type: AstFuncType,
-    val paraId: List<String>,
+    val funcType: AstFuncType,
+    val paraIds: List<String>,
     val body: List<AstNode>
 ): AstNode(ctx) {
+    val retType = funcType.retType
+    val paraTypes = funcType.paraTypes
+    val paraInfo = paraIds.zip(funcType.paraTypes)
+    var memberOf: AstType? = null
+    val isGlobal: Boolean get() = memberOf == null
+    val isMainFunc: Boolean = funcId == "main"
+    var hasReturn: Boolean = false
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 

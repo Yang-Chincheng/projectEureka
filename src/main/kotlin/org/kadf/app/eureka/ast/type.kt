@@ -69,7 +69,7 @@ object AstStringType : AstType() {
 
 class AstUserDefType(val id: String) : AstType() {
     //    override fun typeId() = id
-    override val typeId = "def-$id"
+    override val typeId = "def.$id"
     override fun match(other: AstType) =
         other is AstAnyType || other is AstNullType || (other is AstUserDefType && other.id == id)
 }
@@ -84,6 +84,11 @@ class AstArrayType(val type: AstType, val dim: Int) : AstType() {
     override val typeId = "array"
     override fun match(other: AstType) =
         other is AstAnyType || other is AstNullType || (other is AstArrayType && type.match(other.type) && dim == other.dim)
+    val deRef: AstType
+        get() = when(dim) {
+            1 -> type
+            else -> AstArrayType(type, dim - 1)
+        }
 }
 
 class AstFuncType(val retType: AstType, val paraTypes: List<AstType>) : AstType() {

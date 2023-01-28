@@ -26,13 +26,13 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 tEnv.registerType(it.type) { msg -> reportError(node.ctx, msg) }
             }
 
-        // global variable & function registry
+        // global function registry
         node.decls
             .filterIsInstance<AstFuncDeclNode>()
             .forEach { decl ->
-                if (!tEnv.containType(decl.type))
+                if (!tEnv.containType(decl.funcType))
                     reportError(node.ctx, "function declaration with undeclared type")
-                vEnv.global.registerFun(decl.funcId, decl.type) { msg -> reportError(node.ctx, msg) }
+                vEnv.global.registerFun(decl.funcId, decl.funcType) { msg -> reportError(node.ctx, msg) }
             }
         if (!vEnv.global.containFun("main"))
             reportError(node.ctx, "main function is required")
@@ -53,9 +53,9 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 decl.member
                     .filterIsInstance<AstFuncDeclNode>()
                     .forEach { mFun ->
-                        if (!tEnv.containType(mFun.type))
+                        if (!tEnv.containType(mFun.funcType))
                             reportError(node.ctx, "method declaration with undeclared type")
-                        tEnv.registerMeth(decl.type, mFun.funcId, mFun.type) { msg -> reportError(node.ctx, msg) }
+                        tEnv.registerMeth(decl.type, mFun.funcId, mFun.funcType) { msg -> reportError(node.ctx, msg) }
                     }
             }
 
@@ -80,21 +80,21 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 node.env.registerVar(it, node.type) { msg -> reportError(node.ctx, msg) }
             }
         }
+        node.isGlobal = node.env.isGlobal
     }
 
     override fun visit(node: AstFuncDeclNode) {
         // main function check
-        if (node.funcId == "main") {
-            if (node.type.retType !is AstIntegerType)
+        if (node.isMainFunc) {
+            if (node.retType !is AstIntegerType)
                 reportError(node.ctx, "main function is required to have <int> as its return type")
-            if (node.paraId.isNotEmpty())
+            if (node.paraIds.isNotEmpty())
                 reportError(node.ctx, "main function is required to have no arguments")
         }
         // create environment
         node.env = vEnv.enter(node).apply { isFunction = true }
         // parameter registry
-        node.paraId
-            .zip(node.type.paraTypes)
+        node.paraInfo
             .forEach {
                 node.env.registerVar(it.first, it.second) { msg -> reportError(node.ctx, msg) }
             }
@@ -102,12 +102,15 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         node.body.forEach { it.accept(this) }
         // return check
         node.env.returnType?.let {
-            if (!it.match(node.type.retType))
+            node.hasReturn = true
+            if (!it.match(node.retType))
                 reportError(node.ctx, "function return type mismatching")
         } ?: run {
-            if (node.funcId != "main" && !AstUnitType.match(node.type.retType))
+            node.hasReturn = false
+            if (!node.isMainFunc && !AstUnitType.match(node.retType))
                 reportError(node.ctx, "function <${node.funcId}> requires at least one return statements")
         }
+        node.memberOf = node.env.outerClass?.envType
         // remove environment
         vEnv.leave()
     }
@@ -125,14 +128,18 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         node.member
             .filterIsInstance<AstFuncDeclNode>()
             .forEach {
-                node.env.registerFun(it.funcId, it.type)
+                node.env.registerFun(it.funcId, it.funcType)
             }
         // constructor check
-        val constr = node.member.filterIsInstance<AstConstrNode>()
-        if (constr.size > 1)
-            reportError(node.ctx, "duplicate declaration of class constructor")
-        if (constr.isNotEmpty() && constr.first().id != node.id)
-            reportError(node.ctx, "constructor is required to have the same identifier with the class")
+        val constrList = node.member.filterIsInstance<AstConstrNode>()
+        if (constrList.isNotEmpty()) {
+            val constr = constrList.first()
+            if (constrList.size > 1)
+                reportError(node.ctx, "duplicate declaration of class constructor")
+            if (constr.id != node.id)
+                reportError(node.ctx, "constructor is required to have the same identifier with the class")
+            tEnv.lookupType(node.type)!!.hasConstr = true
+        }
         // traverse
         node.member.forEach { it.accept(this) }
         // remove environment
@@ -144,8 +151,10 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         // traverse
         node.body.forEach { it.accept(this) }
         // return type check
-        if (vEnv.current.returnType?.match(AstUnitType) == false)
+        if (node.env.returnType?.match(AstUnitType) == false)
             reportError(node.ctx, "constructor return type mismatching")
+        node.hasReturned = node.env.returnType != null
+        node.memberOf = node.env.outerClass?.envType
         // remove environment
         vEnv.leave()
     }
@@ -176,18 +185,18 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
 
     override fun visit(node: AstForLoopStmtNode) {
         node.env = vEnv.current
-        // condition type check
-        node.cond?.let {
-            it.accept(this)
-            if (!AstBooleanType.match(it.astType))
-                reportError(node.ctx, "for loop condition expression is required to have <bool> type")
-        }
         // create environment
         vEnv.enter(node).apply { isLoop = true }
         // traverse
         node.init?.accept(this)
         node.iter?.accept(this)
         node.body.accept(this)
+        // condition type check
+        node.cond?.let {
+            it.accept(this)
+            if (!AstBooleanType.match(it.astType))
+                reportError(node.ctx, "for loop condition expression is required to have <bool> type")
+        }
         // remove environment
         vEnv.leave()
     }
@@ -237,7 +246,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         node.astType = node.expr.astType
     }
 
-    override fun visit(node: AstEmptyStmtNode){
+    override fun visit(node: AstEmptyStmtNode) {
         node.env = vEnv.current
     }
 
@@ -250,7 +259,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         node.env = vEnv.current
         if (node.type is AstAnyType) {
             vEnv.current.outerClass?.let {
-                node.astType = (it.node as AstClassDeclNode).type
+                node.astType = it.envType!!
                 return true
             } ?: run {
                 reportError(node.ctx, "<this> expression is only allowed inside classed")
@@ -264,9 +273,9 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
     override fun visit(node: AstVariableExprNode): Boolean {
         // variable registry check
         node.env = vEnv.current
-//        node.env.print()
         node.astType = node.env.getVarType(node.id)
             ?: reportError(node.ctx, "usage of undeclared variable ${node.id}")
+        node.memberOf = node.env.getVarEnv(node.id)?.envType
         return true
     }
 
@@ -278,6 +287,8 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         if (!funcType.invocable(argsType))
             reportError(node.ctx, "function invocation argument mismatching")
         node.astType = funcType.retType
+        node.memberOf = node.env.getFunEnv(node.funcId)?.envType
+
         return false
     }
 
@@ -328,8 +339,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         if (!tEnv.containType(node.type))
             reportError(node.ctx, "lambda expression parameter(s) with undeclared type")
         // parameter registry
-        node.ids
-            .zip(node.type.paraTypes)
+        node.paraInfo
             .forEach {
                 node.env.registerVar(it.first, it.second) { msg -> reportError(node.ctx, msg) }
             }
@@ -368,7 +378,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         node.env = vEnv.current
         val exprIsLeftValue = node.expr.accept(this) as Boolean
         when (node.op) {
-            Operator.PRE_INC, Operator.PRE_DEC -> {
+            AstOperator.PRE_INC, AstOperator.PRE_DEC -> {
                 if (!exprIsLeftValue)
                     reportError(node.ctx, "this operation applies only to left value")
                 if (!AstIntegerType.match(node.expr.astType))
@@ -377,7 +387,7 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 return true
             }
 
-            Operator.POST_INC, Operator.POST_DEC -> {
+            AstOperator.POST_INC, AstOperator.POST_DEC -> {
                 if (!exprIsLeftValue)
                     reportError(node.ctx, "this operator applies only to left values")
                 if (!AstIntegerType.match(node.expr.astType))
@@ -386,14 +396,14 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
                 return false
             }
 
-            Operator.POSIT, Operator.NEG, Operator.NOT -> {
+            AstOperator.POSIT, AstOperator.NEG, AstOperator.NOT -> {
                 if (!AstIntegerType.match(node.expr.astType))
                     reportError(node.ctx, "this operator applies only to expressions of <int> type")
                 node.astType = AstIntegerType
                 return false
             }
 
-            Operator.LOGIC_NOT -> {
+            AstOperator.LOGIC_NOT -> {
                 if (!AstBooleanType.match(node.expr.astType))
                     reportError(node.ctx, "this operator applies only to expression of <bool> type")
                 node.astType = AstBooleanType
@@ -411,36 +421,36 @@ class SemanticChecker(root: AstNode) : ASTVisitor {
         if (!node.lhs.astType.match(node.rhs.astType))
             reportError(node.ctx, "left-hand and right-hand sides type mismatching")
         when (node.op) {
-            Operator.PLUS -> {
+            AstOperator.PLUS -> {
                 if (!AstIntegerType.match(node.lhs.astType) && !AstStringType.match(node.lhs.astType))
                     reportError(node.ctx, "this operator applies only to expressions of <int>/<string> type")
                 node.astType = node.lhs.astType
                 return false
             }
 
-            Operator.LT, Operator.GT, Operator.LE, Operator.GE -> {
+            AstOperator.LT, AstOperator.GT, AstOperator.LE, AstOperator.GE -> {
                 if (!AstIntegerType.match(node.lhs.astType) && !AstStringType.match(node.lhs.astType))
                     reportError(node.ctx, "this operator applies only to expressions of <int>/<string> type")
                 node.astType = AstBooleanType
                 return false
             }
 
-            Operator.MINUS, Operator.MUL, Operator.DIV, Operator.MOD,
-            Operator.AND, Operator.OR, Operator.XOR, Operator.LSH, Operator.RSH -> {
+            AstOperator.MINUS, AstOperator.MUL, AstOperator.DIV, AstOperator.MOD,
+            AstOperator.AND, AstOperator.OR, AstOperator.XOR, AstOperator.LSH, AstOperator.RSH -> {
                 if (!AstIntegerType.match(node.lhs.astType))
                     reportError(node.ctx, "this operator applies only to expressions of <int> type")
                 node.astType = AstIntegerType
                 return false
             }
 
-            Operator.LOGIC_OR, Operator.LOGIC_AND -> {
+            AstOperator.LOGIC_OR, AstOperator.LOGIC_AND -> {
                 if (!AstBooleanType.match(node.lhs.astType))
                     reportError(node.ctx, "this operator applies only to expressions of <bool> type")
                 node.astType = AstBooleanType
                 return false
             }
 
-            Operator.EQ, Operator.NE -> {
+            AstOperator.EQ, AstOperator.NE -> {
                 node.astType = AstBooleanType
                 return false
             }

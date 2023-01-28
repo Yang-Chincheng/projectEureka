@@ -1,69 +1,114 @@
 package org.kadf.app.eureka.ir
 
-sealed interface Type
+sealed interface IrType {
+    val bytes: Int get() = 0
+    val bits: Int get() = 0
+}
 
-//sealed interface FirstClassType: IRNode
-//sealed interface SingleValueType: IRNode, FirstClassType
-//sealed interface AggregateType: IRNode, FirstClassType, ReturnableType
-//sealed interface ReturnableType: IRNode
+val IrType.asRef get() = IrPointerType(this)
+val IrType.deRef get() = if (this is IrPointerType) refType else this
+val IrType.isBoolPtr get() = this is IrPointerType && refType is IrBoolType
+val IrType.isIntPtr get() = this is IrPointerType && refType is IrIntType
 
 // IRType / VoidType
-object VoidType: Type {
+object IrVoidType : IrType {
     override fun toString(): String = "void"
 }
 
 // IRType / FunctionType
-class FunctionType(
-    val retType: Type,
-    val paraType: List<Type>
-): Type
+class IrFunctionType(
+    val retType: IrType,
+    val paraTypes: List<IrType>
+) : IrType {
+    constructor(vararg types: IrType): this(types.first(), types.drop(1))
+}
 
 // IRType / FirstClassTypes / SingleValueTypes / IntegerType
-open class IntegerType(
-    val len: Int
-): Type {
+open class IrIntegerType(
+    private val len: Int
+) : IrType {
     override fun toString(): String = "i$len"
+    override val bits: Int = len
+    override val bytes: Int = len / 8
 }
-object IntType: IntegerType(32)
-object CharType: IntegerType(8)
-object BoolType: IntegerType(1)
+
+object IrIntType : IrIntegerType(32)
+
+object IrCharType : IrIntegerType(8)
+
+object IrBoolType : IrIntegerType(1) {
+    override val bits: Int = 8
+    override val bytes: Int = 1
+}
+
 
 // IRType / FirstClassTypes / SingleValueTypes / PointerType
-object PointerType: Type {
-    override fun toString(): String = "ptr"
-}
+open class IrPointerType(val refType: IrType) : IrType {
+    constructor(basicType: IrType, dim: Int): this(
+        when(dim) {
+            1 -> basicType
+            else -> IrPointerType(basicType, dim - 1)
+        }
+    )
+    override fun toString(): String = if (isBoolPtr) "i8*" else "$refType*"
+    override val bytes = 8
+    override val bits = 64
 
-// IRType / FirstClassTypes / LabelType
-object LabelType: Type {
-    override fun toString(): String = "label"
 }
 
 // IRType / FirstClassTypes / AggregateTypes / ArrayType
-class ArrayType(
-    val len: Int,
-    val subtype: Type
-): Type {
+open class IrArrayType(
+    private val len: Int,
+    private val subtype: IrType
+) : IrType {
 
-    constructor(
-        type: Type,
-        scale: List<Int>
-    ) : this(
+    constructor(type: IrType, scale: List<Int>) : this(
         scale.first(),
         when (scale.size) {
             1 -> type
-            else -> ArrayType(type, scale.subList(1, scale.size))
+            else -> IrArrayType(type, scale.subList(1, scale.size))
         }
     )
 
     override fun toString(): String = "[$len x $subtype]"
+    override val bits = subtype.bits * len
+    override val bytes = subtype.bytes * len
 }
 
+val IrStringType = IrPointerType(IrCharType)
+
 // IRType / FirstClassTypes / AggregateTypes / StructureType
-class StructType(
-    val subtype: List<Type>
-): Type {
+class IrStructType(
+    private val subtype: List<IrType>
+) : IrType {
+
+    private val offsets = mutableListOf<Int>()
+    private var size = 0
+    init {
+        subtype.forEach {
+            while(size % it.bytes != 0) size++
+            offsets.add(size)
+            size += it.bytes
+        }
+    }
+
     override fun toString(): String {
-        val seq = subtype.map { "$it" }.reduce { acc, s -> "$acc, $s" }
+        assert(subtype.isNotEmpty())
+        val seq = subtype
+            .map { if (it is IrBoolType) "i8" else "$it" }
+            .reduce { acc, s -> "$acc, $s" }
         return "{ $seq }"
     }
+
+    override val bytes = size
+    override val bits = size * 8
+    fun offsetOf(idx: Int) = offsets[idx]
+}
+
+class IrTypeAlias(
+    val typeId: IrTypeIdent
+): IrType {
+    constructor(id: String): this(IrTypeIdent(id))
+
+    override fun toString(): String = "$typeId"
 }

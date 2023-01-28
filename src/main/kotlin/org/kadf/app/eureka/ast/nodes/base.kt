@@ -12,8 +12,7 @@ sealed class AstNode(val ctx: CodeContext) {
     abstract fun accept(visitor: ASTVisitor): Any
     lateinit var env: VarEnv
     var astType: AstType = AstNothingType
-
-//    abstract fun print()
+    var inferType: AstType = AstNothingType
 }
 
 class AstProgramNode(
@@ -21,7 +20,4 @@ class AstProgramNode(
     val decls: List<AstNode>
 ): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
-//    override fun print() {
-//
-//    }
 }

@@ -15,6 +15,8 @@ class AstVariableExprNode(
     ctx: CodeContext,
     val id: String
 ) : AstNode(ctx) {
+    var memberOf: AstType? = null
+    val isMember: Boolean get() = memberOf != null
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
@@ -23,6 +25,8 @@ class AstInvocationExprNode(
     val funcId: String,
     val args: List<AstNode>
 ): AstNode(ctx) {
+    var memberOf: AstType? = null
+    val isMember: Boolean get() = memberOf != null
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
@@ -32,6 +36,10 @@ class AstPropertyExprNode(
     val id: String
 ): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
+    fun collect(): List<AstPropertyExprNode> {
+        return if (obj !is AstPropertyExprNode) listOf(this)
+        else obj.collect() + listOf(this)
+    }
 }
 
 class AstMethodExprNode(
@@ -49,6 +57,10 @@ class AstIndexExprNode(
     val idx: AstNode
 ) : AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
+    fun collect(): List<AstIndexExprNode> {
+        return if (arr !is AstIndexExprNode) listOf(this)
+        else arr.collect() + listOf(this)
+    }
 }
 
 class AstLambdaExprNode(
@@ -59,6 +71,9 @@ class AstLambdaExprNode(
     val body: List<AstNode>,
     val args: List<AstNode>
 ) : AstNode(ctx) {
+    val paraTypes = type.paraTypes
+    val retType = type.retType
+    val paraInfo = ids.zip(type.paraTypes)
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
 
@@ -68,6 +83,10 @@ class AstAssignExprNode(
     val rhs: AstNode
 ) : AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
+    fun collectRightAssoc(): List<AstNode> {
+        return if (rhs !is AstAssignExprNode) listOf(lhs, rhs)
+        else listOf(lhs) + rhs.collectRightAssoc()
+    }
 }
 
 class AstCompoundExprNode(
@@ -99,7 +118,7 @@ class AstNewObjectNode(
 class AstUnaryExprNode(
     ctx: CodeContext,
     val expr: AstNode,
-    val op: Operator
+    val op: AstOperator
 ): AstNode(ctx) {
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }
@@ -108,19 +127,15 @@ class AstBinaryExprNode(
     ctx: CodeContext,
     val lhs: AstNode,
     val rhs: AstNode,
-    val op: Operator
+    val op: AstOperator
 ): AstNode(ctx) {
-    private fun isLast() = rhs !is AstBinaryExprNode || rhs.op != op
-    fun collect(): List<AstNode> {
-        var cur = this
-        val ret = mutableListOf<AstNode>()
-        while(!cur.isLast()) {
-            ret.add(cur.lhs)
-            cur = cur.rhs as AstBinaryExprNode
-        }
-        ret.add(cur.lhs)
-        ret.add(cur.rhs)
-        return ret
+    fun collectRightAssoc(): List<AstNode> {
+        return if (rhs !is AstBinaryExprNode || rhs.op != op) listOf(lhs, rhs)
+        else listOf(lhs) + rhs.collectRightAssoc()
+    }
+    fun collectLeftAssoc(): List<AstNode> {
+        return if (lhs !is AstBinaryExprNode || lhs.op != op) listOf(lhs, rhs)
+        else lhs.collectLeftAssoc() + listOf(rhs)
     }
     override fun accept(visitor: ASTVisitor) = visitor.visit(this)
 }

@@ -1,32 +1,37 @@
 package org.kadf.app.eureka.ir
-
-sealed class Value(
-    val type: Type,
-    val id: String? = null,
-    private val userList: MutableList<IUser> = mutableListOf()
+//
+sealed class IrValue(
+    val type: IrType,
+    val id: IrIdent = IrAnonymousIdent,
+    val isAddress: Boolean = false
 ) {
-    open fun addUser(user: IUser) { userList.add(user) }
+    private val user: MutableList<IrUser> = mutableListOf()
+    open fun addUser(vararg users: IrUser) { user.addAll(users) }
     override fun toString(): String = "$id"
     open val ir: String = "<undef>"
 }
 
-class SymbolTable {
-    private val addrTable: HashMap<String, Value> = hashMapOf()
-    private val cntTable: HashMap<String, Int> = hashMapOf()
+val IrValue.deRefType get() = type.deRef
+val IrValue.asRefType get() = type.asRef
 
-    fun clear() {
-        addrTable.clear()
-        cntTable.clear()
-    }
+sealed interface IrUser
 
-    fun rename(id: String): String {
-        val cnt = cntTable[id] ?: 0
-        return "$id.${cnt}".also { cntTable[id] = cnt + 1 }
-    }
+class IrParameter(id: IrVarIdent, type: IrType): IrValue(type, id)
 
-    fun getAddress(id: String): Value? = addrTable[id]
-    fun putAddress(id: String, value: Value) { addrTable[id] = value }
-
+class IrGlobalAssign(
+    id: IrVarIdent,
+    private val value: IrValue
+): IrValue(value.asRefType, id) {
+    override val ir: String
+        get() = if (value.type is IrBoolType) "$id = global i8 $value"
+            else "$id = global ${value.type} $value"
 }
 
-sealed interface IUser
+class IrConstAssign(
+    id: IrVarIdent,
+    private val value: IrValue
+): IrValue(value.asRefType, id) {
+    override val ir: String
+        get() = if (value.type is IrBoolType) "$id = constant i8 $value"
+        else "$id = constant ${value.type} $value"
+}

@@ -1,6 +1,7 @@
 package org.kadf.app.eureka.semantic
 
 import org.kadf.app.eureka.ast.*
+import org.kadf.app.eureka.ast.nodes.AstClassDeclNode
 import org.kadf.app.eureka.ast.nodes.AstNode
 import org.kadf.app.eureka.ir.IrValue
 import org.kadf.app.eureka.utils.DefaultErrorHandler
@@ -9,6 +10,11 @@ import org.kadf.app.eureka.utils.ErrorHandler
 class TypeBinding {
     val properties = mutableMapOf<String, AstType>()
     val methods = mutableMapOf<String, AstFuncType>()
+    val propTypes = properties.values
+    val propIds = properties.keys
+    val methTypes = methods.values
+    val methIds = methods.keys
+    var hasConstr: Boolean = false
 }
 
 class TypeEnv {
@@ -54,6 +60,10 @@ class TypeEnv {
             handler.report("try registering method of an nonexistent type")
         }
     }
+
+    fun getPropIdx(type: AstType, id: String): Int? {
+        return lookupType(type)?.properties?.keys?.indexOf(id)
+    }
 }
 
 class VarBinding(
@@ -64,13 +74,16 @@ class VarBinding(
 
 class VarEnv(
     val outer: VarEnv?,
-    val node: AstNode? = null,
+    node: AstNode? = null,
     typeEnv: TypeEnv? = null
 ) {
     var capture = true
-    private val bindings = mutableMapOf<String, VarBinding>()
     val tEnv: TypeEnv = typeEnv ?: outer!!.tEnv
-    
+    private val bindings = mutableMapOf<String, VarBinding>()
+
+    val envType: AstType? = if (node is AstClassDeclNode) node.type else null
+
+    val isGlobal = outer == null
     var isClass = false
     var isFunction = false
     var isLoop = false
@@ -78,34 +91,35 @@ class VarEnv(
     var returnType: AstType? = null
     private val outerEnv: List<VarEnv>
         get() {
-            var env = this
-            val ret = mutableListOf<VarEnv>()
-            while (env.outer != null) {
-                ret.add(env)
-                env = env.outer!!
-            }
-            return ret
+            return listOf(this) + (outer?.outerEnv ?: listOf())
+//            var env = this
+//            val ret = mutableListOf<VarEnv>()
+//            while (env.outer != null) {
+//                ret.add(env)
+//                env = env.outer!!
+//            }
+//            return ret
         }
 
     private fun contain(id: String) = bindings[id] != null
-    fun containVar(id: String) = contain("var-$id")
-    fun containFun(id: String) = contain("fun-$id")
+    fun containVar(id: String) = contain("var.$id")
+    fun containFun(id: String) = contain("fun.$id")
 
     private fun lookup(id: String): VarBinding? {
         return bindings[id] ?: if (capture) outer?.lookup(id) else null
     }
 
-    fun getVarType(id: String) = lookup("var-$id")?.type
-    fun getFunType(id: String) = lookup("fun-$id")?.type as? AstFuncType
+    fun getVarType(id: String) = lookup("var.$id")?.type
+    fun getFunType(id: String) = lookup("fun.$id")?.type as? AstFuncType
 
-    fun getVarValue(id: String) = lookup("var-$id")?.value
-    fun getFunValue(id: String) = lookup("fun-$id")?.value
+    fun getVarValue(id: String) = lookup("var.$id")?.value
+    fun getFunValue(id: String) = lookup("fun.$id")?.value
     fun setVarValue(id: String, value: IrValue) {
-        lookup("var-$id")?.let { it.value = value }
+        lookup("var.$id")?.let { it.value = value }
     }
 
     fun setFunValue(id: String, value: IrValue) {
-        lookup("fun-$id")?.let { it.value = value }
+        lookup("fun.$id")?.let { it.value = value }
     }
 
     private fun register(id: String, binding: VarBinding, handler: ErrorHandler = DefaultErrorHandler) {
@@ -114,19 +128,26 @@ class VarEnv(
     }
 
     fun registerVar(id: String, type: AstType, handler: ErrorHandler = DefaultErrorHandler) {
-        if (tEnv.contain("def-$id")) handler.report("registry id conflict with type id")
-        register("var-$id", VarBinding(type), handler)
+        if (tEnv.contain("def.$id")) handler.report("registry id conflict with type id")
+        register("var.$id", VarBinding(type), handler)
     }
 
     fun registerFun(id: String, type: AstFuncType, handler: ErrorHandler = DefaultErrorHandler) {
-        if (tEnv.contain("def-$id")) handler.report("registry id conflict with type id")
-        register("fun-$id", VarBinding(type), handler)
+        if (tEnv.contain("def.$id")) handler.report("registry id conflict with type id")
+        register("fun.$id", VarBinding(type), handler)
     }
 
     val outerFunc get() = outerEnv.firstOrNull { it.isFunction }
     val outerClass get() = outerEnv.firstOrNull { it.isClass }
     val outerLambda get() = outerEnv.firstOrNull { it.isLambda }
     val outerLoop get() = outerEnv.firstOrNull { it.isLoop }
+
+    fun getVarEnv(id: String): VarEnv? {
+        return outerEnv.firstOrNull { it.containVar(id) }
+    }
+    fun getFunEnv(id: String): VarEnv? {
+        return outerEnv.firstOrNull { it.containFun(id) }
+    }
 //    fun isMemberVar(id: String): Boolean {
 //        return outerEnv.firstOrNull { it.containVar(id) }?.isClass ?: false
 //    }

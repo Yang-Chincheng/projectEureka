@@ -56,12 +56,12 @@ class ASTBuilder(private val src: CodeSource?) : MxStarParserBaseVisitor<AstNode
     override fun visitFuncDecl(node: FuncDeclContext?) = AstFuncDeclNode(
         ctx = node!!.ctx,
         funcId = node.Identifier().text,
-        type = AstFuncType(
+        funcType = AstFuncType(
             node.returnableType().type,
             node.parameterList().entrys
                 .map { it.declarableType().type }
         ),
-        paraId = node.parameterList().entrys.map { it.Identifier().text },
+        paraIds = node.parameterList().entrys.map { it.Identifier().text },
         body = node.stmtBlock().statement()
             ?.map { visit(it) } ?: listOf()
     )
@@ -201,8 +201,8 @@ class ASTBuilder(private val src: CodeSource?) : MxStarParserBaseVisitor<AstNode
         node!!.ctx,
         visit(node.obj),
         when (node.op.text) {
-            "++" -> Operator.PRE_INC
-            "--" -> Operator.PRE_DEC
+            "++" -> AstOperator.PRE_INC
+            "--" -> AstOperator.PRE_DEC
             else -> throw Exception()
         }
     )
@@ -211,8 +211,8 @@ class ASTBuilder(private val src: CodeSource?) : MxStarParserBaseVisitor<AstNode
         node!!.ctx,
         visit(node.obj),
         when (node.op.text) {
-            "++" -> Operator.POST_INC
-            "--" -> Operator.POST_DEC
+            "++" -> AstOperator.POST_INC
+            "--" -> AstOperator.POST_DEC
             else -> throw Exception()
         }
     )
@@ -221,10 +221,10 @@ class ASTBuilder(private val src: CodeSource?) : MxStarParserBaseVisitor<AstNode
         node!!.ctx,
         visit(node.rhs),
         when (node.op.text) {
-            "!" -> Operator.LOGIC_NOT
-            "~" -> Operator.NOT
-            "+" -> Operator.POSIT
-            "-" -> Operator.NEG
+            "!" -> AstOperator.LOGIC_NOT
+            "~" -> AstOperator.NOT
+            "+" -> AstOperator.POSIT
+            "-" -> AstOperator.NEG
             else -> throw Exception()
         }
     )
@@ -234,24 +234,24 @@ class ASTBuilder(private val src: CodeSource?) : MxStarParserBaseVisitor<AstNode
         visit(node.lhs),
         visit(node.rhs),
         when (node.op.text) {
-            "+" -> Operator.PLUS
-            "-" -> Operator.MINUS
-            "*" -> Operator.MUL
-            "/" -> Operator.DIV
-            "%" -> Operator.MOD
-            "<" -> Operator.LT
-            ">" -> Operator.GT
-            "<=" -> Operator.LE
-            ">=" -> Operator.GE
-            "==" -> Operator.EQ
-            "!=" -> Operator.NE
-            "||" -> Operator.LOGIC_OR
-            "&&" -> Operator.LOGIC_AND
-            "&" -> Operator.AND
-            "|" -> Operator.OR
-            "^" -> Operator.XOR
-            "<<" -> Operator.LSH
-            ">>" -> Operator.RSH
+            "+" -> AstOperator.PLUS
+            "-" -> AstOperator.MINUS
+            "*" -> AstOperator.MUL
+            "/" -> AstOperator.DIV
+            "%" -> AstOperator.MOD
+            "<" -> AstOperator.LT
+            ">" -> AstOperator.GT
+            "<=" -> AstOperator.LE
+            ">=" -> AstOperator.GE
+            "==" -> AstOperator.EQ
+            "!=" -> AstOperator.NE
+            "||" -> AstOperator.LOGIC_OR
+            "&&" -> AstOperator.LOGIC_AND
+            "&" -> AstOperator.AND
+            "|" -> AstOperator.OR
+            "^" -> AstOperator.XOR
+            "<<" -> AstOperator.LSH
+            ">>" -> AstOperator.RSH
             else -> throw Exception()
         }
     )
